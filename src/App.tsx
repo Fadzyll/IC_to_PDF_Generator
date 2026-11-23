@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadImage, rotate90, wipe } from './lib/image'
+import { loadImage, rotate180, wipe } from './lib/image'
 import { renderCard, CARD_H_MM, CARD_W_MM, PAD_RATIO } from './lib/card'
 import { A4_MM, CARD_CENTERS, CARD_WIDTH_MM, type CardSize } from './lib/layout'
+import { detectCard } from './lib/detect'
+import { defaultQuad, warpCard, type Quad } from './lib/perspective'
 import {
   CAPTION_PRESETS,
   DEFAULT_WATERMARK,
   type WatermarkOptions,
   type WatermarkPosition,
 } from './lib/watermark'
+import { Cropper, type CropResult } from './components/Cropper'
+import { Camera } from './components/Camera'
 
 type Side = 'front' | 'back'
 const SIDES: Side[] = ['front', 'back']
@@ -17,63 +21,131 @@ const LABEL: Record<Side, string> = { front: 'Front', back: 'Back' }
 const PREVIEW_PX = 700
 const EXPORT_PX = 1600
 
+interface SideState {
+  /** Original photo (downscaled), kept so the crop can be edited again. */
+  source: HTMLCanvasElement
+  crop: CropResult
+  /** Straightened, card-shaped result. */
+  card: HTMLCanvasElement
+}
+
+type Sides = Record<Side, SideState | null>
+
+/** What's open on top of the main page. */
+type Overlay =
+  | { kind: 'camera'; side: Side }
+  | { kind: 'crop'; side: Side; source: HTMLCanvasElement; initial: CropResult }
+  | null
+
+const hasLiveCamera = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+
+/** Let React paint a "Processing…" state before blocking work. */
+const nextFrame = () => new Promise((r) => setTimeout(r, 30))
+
 export default function App() {
-  const [photos, setPhotos] = useState<Record<Side, HTMLCanvasElement | null>>({ front: null, back: null })
+  const [sides, setSides] = useState<Sides>({ front: null, back: null })
+  const [overlay, setOverlay] = useState<Overlay>(null)
   const [wm, setWm] = useState<WatermarkOptions>(DEFAULT_WATERMARK)
   const [size, setSize] = useState<CardSize>('enlarged')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const captureInputs = useRef<Record<Side, HTMLInputElement | null>>({ front: null, back: null })
 
-  const ready = photos.front !== null && photos.back !== null
+  const cards = useMemo(() => ({ front: sides.front?.card ?? null, back: sides.back?.card ?? null }), [sides])
+  const ready = cards.front !== null && cards.back !== null
   const update = <K extends keyof WatermarkOptions>(k: K, v: WatermarkOptions[K]) => setWm((p) => ({ ...p, [k]: v }))
+
+  /** A new photo arrived (camera or file): find the card, then open the cropper. */
+  async function startCrop(side: Side, source: HTMLCanvasElement, guide?: Quad) {
+    setBusy('Finding card edges…')
+    await nextFrame()
+    const quad = detectCard(source, guide) ?? guide ?? defaultQuad(source.width, source.height)
+    setBusy(null)
+    setOverlay({ kind: 'crop', side, source, initial: { quad, flipped: false } })
+  }
 
   async function onPick(side: Side, file: File | undefined) {
     if (!file) return
     setError(null)
     try {
       const img = await loadImage(file)
-      wipe(photos[side])
-      setPhotos((p) => ({ ...p, [side]: img }))
+      await startCrop(side, img)
     } catch {
+      setBusy(null)
       setError('Could not read that image. Please try another photo.')
     }
   }
 
-  function onRotate(side: Side) {
-    const src = photos[side]
-    if (!src) return
-    const out = rotate90(src)
-    setPhotos((p) => ({ ...p, [side]: out }))
-    wipe(src)
+  function onSnap(side: Side) {
+    setError(null)
+    if (hasLiveCamera()) setOverlay({ kind: 'camera', side })
+    else captureInputs.current[side]?.click()
+  }
+
+  async function onCropDone(side: Side, source: HTMLCanvasElement, crop: CropResult) {
+    setOverlay(null)
+    setBusy('Straightening…')
+    await nextFrame()
+    let card = warpCard(source, crop.quad)
+    if (crop.flipped) {
+      const f = rotate180(card)
+      wipe(card)
+      card = f
+    }
+    const old = sides[side]
+    if (old) {
+      if (old.source !== source) wipe(old.source)
+      wipe(old.card)
+    }
+    setSides((s) => ({ ...s, [side]: { source, crop, card } }))
+    setBusy(null)
+  }
+
+  function onCropCancel(side: Side, source: HTMLCanvasElement) {
+    // Discard a brand-new photo, but never the one already in use.
+    if (sides[side]?.source !== source) wipe(source)
+    setOverlay(null)
+  }
+
+  function onEdit(side: Side) {
+    const s = sides[side]
+    if (s) setOverlay({ kind: 'crop', side, source: s.source, initial: s.crop })
   }
 
   function onRemove(side: Side) {
-    wipe(photos[side])
-    setPhotos((p) => ({ ...p, [side]: null }))
+    const s = sides[side]
+    if (s) {
+      wipe(s.source)
+      wipe(s.card)
+    }
+    setSides((p) => ({ ...p, [side]: null }))
   }
 
   function clearAll() {
-    SIDES.forEach((s) => wipe(photos[s]))
-    setPhotos({ front: null, back: null })
+    SIDES.forEach((s) => {
+      wipe(sides[s]?.source)
+      wipe(sides[s]?.card)
+    })
+    setSides({ front: null, back: null })
     setWm(DEFAULT_WATERMARK)
     setError(null)
   }
 
   async function makePdfFile(): Promise<File> {
-    const cards = SIDES.map((s) => renderCard(photos[s]!, wm, EXPORT_PX))
+    const rendered = SIDES.map((s) => renderCard(cards[s]!, wm, EXPORT_PX))
     try {
       // pdf-lib is large, so load it only when it's needed.
       const { buildPdf } = await import('./lib/pdf')
-      const bytes = await buildPdf(cards, size)
+      const bytes = await buildPdf(rendered, size)
       const slug = wm.text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'copy'
       return new File([bytes as BlobPart], `IC-${slug}.pdf`, { type: 'application/pdf' })
     } finally {
-      cards.forEach((c) => wipe(c.canvas))
+      rendered.forEach((c) => wipe(c.canvas))
     }
   }
 
   async function onDownload() {
-    setBusy(true)
+    setBusy('Generating PDF…')
     setError(null)
     try {
       const file = await makePdfFile()
@@ -86,14 +158,14 @@ export default function App() {
     } catch {
       setError('Something went wrong generating the PDF.')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   const canShare = typeof navigator !== 'undefined' && 'canShare' in navigator
 
   async function onShare() {
-    setBusy(true)
+    setBusy('Generating PDF…')
     setError(null)
     try {
       const file = await makePdfFile()
@@ -105,17 +177,20 @@ export default function App() {
     } catch (e) {
       if ((e as Error)?.name !== 'AbortError') setError('Could not share the PDF.')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
+
+  // Lock page scroll while a full-screen overlay is open.
+  useEffect(() => {
+    document.body.style.overflow = overlay ? 'hidden' : ''
+  }, [overlay])
 
   return (
     <div className="app">
       <header>
         <h1>IC to PDF</h1>
-        <p className="privacy">
-          🔒 Your photos never leave this device. Everything is processed in your browser.
-        </p>
+        <p className="privacy">🔒 Your photos never leave this device. Everything is processed in your browser.</p>
       </header>
 
       <section className="panel">
@@ -125,9 +200,11 @@ export default function App() {
             <CaptureSlot
               key={side}
               label={LABEL[side]}
-              photo={photos[side]}
+              card={cards[side]}
+              captureRef={(el) => (captureInputs.current[side] = el)}
+              onSnap={() => onSnap(side)}
               onPick={(f) => onPick(side, f)}
-              onRotate={() => onRotate(side)}
+              onEdit={() => onEdit(side)}
               onRemove={() => onRemove(side)}
             />
           ))}
@@ -199,17 +276,17 @@ export default function App() {
             Actual size
           </button>
         </div>
-        <A4Preview photos={photos} wm={wm} size={size} />
+        <A4Preview cards={cards} wm={wm} size={size} />
       </section>
 
       {error && <p className="error">{error}</p>}
 
       <div className="actions">
-        <button type="button" className="primary" disabled={!ready || busy} onClick={onDownload}>
-          {busy ? 'Generating…' : 'Download PDF'}
+        <button type="button" className="primary" disabled={!ready || !!busy} onClick={onDownload}>
+          Download PDF
         </button>
         {canShare && (
-          <button type="button" disabled={!ready || busy} onClick={onShare}>
+          <button type="button" disabled={!ready || !!busy} onClick={onShare}>
             Share
           </button>
         )}
@@ -218,19 +295,51 @@ export default function App() {
         </button>
       </div>
       {!ready && <p className="hint">Add both the front and back photos to generate the PDF.</p>}
+
+      {overlay?.kind === 'camera' && (
+        <Camera
+          title={LABEL[overlay.side]}
+          onCancel={() => setOverlay(null)}
+          onFallback={() => {
+            setOverlay(null)
+            captureInputs.current[overlay.side]?.click()
+          }}
+          onCapture={(frame, guide) => {
+            setOverlay(null)
+            startCrop(overlay.side, frame, guide)
+          }}
+        />
+      )}
+      {overlay?.kind === 'crop' && (
+        <Cropper
+          key={`${overlay.side}-${overlay.source.width}`}
+          title={LABEL[overlay.side]}
+          source={overlay.source}
+          initial={overlay.initial}
+          onCancel={() => onCropCancel(overlay.side, overlay.source)}
+          onDone={(r) => onCropDone(overlay.side, overlay.source, r)}
+        />
+      )}
+      {busy && (
+        <div className="busy" role="status">
+          <div className="spinner" />
+          {busy}
+        </div>
+      )}
     </div>
   )
 }
 
 function CaptureSlot(props: {
   label: string
-  photo: HTMLCanvasElement | null
+  card: HTMLCanvasElement | null
+  captureRef: (el: HTMLInputElement | null) => void
+  onSnap: () => void
   onPick: (f: File | undefined) => void
-  onRotate: () => void
+  onEdit: () => void
   onRemove: () => void
 }) {
-  const { label, photo, onPick, onRotate, onRemove } = props
-  const camRef = useRef<HTMLInputElement>(null)
+  const { label, card, captureRef, onSnap, onPick, onEdit, onRemove } = props
   const fileRef = useRef<HTMLInputElement>(null)
 
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,19 +351,25 @@ function CaptureSlot(props: {
     <div className="slot">
       <div className="slot-head">{label}</div>
       <div className="slot-body">
-        {photo ? <CanvasView source={photo} className="thumb" /> : <div className="placeholder">No photo yet</div>}
+        {card ? (
+          <button type="button" className="thumb-btn" onClick={onEdit} aria-label={`Edit ${label} crop`}>
+            <CanvasView source={card} className="thumb" />
+          </button>
+        ) : (
+          <div className="placeholder">No photo yet</div>
+        )}
       </div>
       <div className="slot-actions">
-        <button type="button" onClick={() => camRef.current?.click()}>
+        <button type="button" onClick={onSnap}>
           📷 Snap
         </button>
         <button type="button" onClick={() => fileRef.current?.click()}>
           Upload
         </button>
-        {photo && (
+        {card && (
           <>
-            <button type="button" onClick={onRotate} aria-label={`Rotate ${label}`}>
-              ⟳
+            <button type="button" onClick={onEdit} aria-label={`Edit ${label} crop`}>
+              ✂️
             </button>
             <button type="button" onClick={onRemove} aria-label={`Remove ${label}`}>
               ✕
@@ -262,16 +377,17 @@ function CaptureSlot(props: {
           </>
         )}
       </div>
-      <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+      {/* Fallback when live camera isn't available: the OS camera app. */}
+      <input ref={captureRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} />
     </div>
   )
 }
 
-function A4Preview({ photos, wm, size }: { photos: Record<Side, HTMLCanvasElement | null>; wm: WatermarkOptions; size: CardSize }) {
+function A4Preview({ cards, wm, size }: { cards: Record<Side, HTMLCanvasElement | null>; wm: WatermarkOptions; size: CardSize }) {
   const rendered = useMemo(
-    () => SIDES.map((s) => (photos[s] ? renderCard(photos[s]!, wm, PREVIEW_PX).canvas : null)),
-    [photos, wm],
+    () => SIDES.map((s) => (cards[s] ? renderCard(cards[s]!, wm, PREVIEW_PX).canvas : null)),
+    [cards, wm],
   )
 
   // Layout in % of the A4 page, matching the PDF exactly.

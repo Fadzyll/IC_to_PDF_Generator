@@ -8,30 +8,32 @@ const MAX_EDGE = 2000
 export async function loadImage(file: File): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
   try {
-    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
-    const w = Math.round(bitmap.width * scale)
-    const h = Math.round(bitmap.height * scale)
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')!
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(bitmap, 0, 0, w, h)
-    // A card is landscape; a portrait photo was almost certainly taken sideways.
-    return h > w ? rotate90(canvas) : canvas
+    return toCanvas(bitmap, bitmap.width, bitmap.height)
   } finally {
     bitmap.close()
   }
 }
 
-/** Rotate a canvas 90° clockwise, returning a new canvas. */
-export function rotate90(src: HTMLCanvasElement): HTMLCanvasElement {
+/** Copy any drawable (bitmap, video frame) into a canvas, downscaled to MAX_EDGE. */
+export function toCanvas(source: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+  const scale = Math.min(1, MAX_EDGE / Math.max(width, height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(width * scale)
+  canvas.height = Math.round(height * scale)
+  const ctx = canvas.getContext('2d')!
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+  return canvas
+}
+
+/** Rotate a canvas 180°, returning a new canvas. */
+export function rotate180(src: HTMLCanvasElement): HTMLCanvasElement {
   const out = document.createElement('canvas')
-  out.width = src.height
-  out.height = src.width
+  out.width = src.width
+  out.height = src.height
   const ctx = out.getContext('2d')!
-  ctx.translate(out.width, 0)
-  ctx.rotate(Math.PI / 2)
+  ctx.translate(out.width, out.height)
+  ctx.rotate(Math.PI)
   ctx.drawImage(src, 0, 0)
   return out
 }

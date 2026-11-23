@@ -291,3 +291,232 @@ button.ghost {
   font-size: 0.85rem;
   margin-top: 8px;
 }
+
+/* Thumbnail acts as an "edit crop" button */
+.thumb-btn {
+  all: unset;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.thumb-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Full-screen overlays (camera, cropper): always dark */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #0b0d12;
+  color: #f2f4f8;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.modal button {
+  background: #1f2430;
+  border-color: #343b4b;
+  color: #f2f4f8;
+}
+
+.modal button.primary {
+  background: #3d7cf0;
+  border-color: #3d7cf0;
+  color: #fff;
+}
+
+.modal button.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.modal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+}
+
+/* Cropper */
+.crop-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.crop-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+}
+
+.crop-img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 300px);
+  width: auto;
+  height: auto;
+}
+
+.crop-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  overflow: visible;
+}
+
+.loupe {
+  position: absolute;
+  top: 8px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.loupe.left {
+  left: 8px;
+}
+
+.loupe.right {
+  right: 8px;
+}
+
+.crop-tools {
+  padding: 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.crop-preview canvas {
+  display: block;
+  height: 90px;
+  width: auto;
+  border-radius: 6px;
+  background: #222;
+}
+
+.crop-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.crop-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #a9b1c2;
+  text-align: center;
+}
+
+/* Camera */
+.cam-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cam-frame {
+  position: relative;
+}
+
+.cam-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cam-guide {
+  position: absolute;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  border-radius: 4%/6%;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.cam-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  z-index: 1;
+}
+
+.cam-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 20px;
+}
+
+.cam-controls p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #a9b1c2;
+  text-align: center;
+}
+
+.modal .shutter {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid #3d4558;
+  box-shadow: 0 0 0 3px #fff;
+  padding: 0;
+}
+
+/* Busy overlay */
+.busy {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -200,11 +200,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>IC to PDF</h1>
-        <p className="privacy">🔒 Your photos never leave this device. Everything is processed in your browser.</p>
-      </header>
-
       <section className="panel">
         <h2>1. Capture your IC</h2>
         <div className="slots">

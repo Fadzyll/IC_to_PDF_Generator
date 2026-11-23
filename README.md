@@ -42,6 +42,18 @@ npm run build
 Import the GitHub repo in Vercel. It auto-detects Vite and deploys `dist/` as a static
 site, with no serverless functions.
 
+## SEO
+
+- Title, description, canonical link, Open Graph/Twitter preview image (`public/og-image.jpg`)
+- JSON-LD structured data: `WebApplication` (free) and `FAQPage`
+- Crawlable header, how-it-works and FAQ in plain HTML (English and Bahasa Melayu) in `index.html`
+- `robots.txt` and `sitemap.xml` generated at build time (`seo.config.ts`)
+
+The site URL is taken from Vercel's production domain automatically. To use a custom
+domain, set the `SITE_URL` environment variable in Vercel (e.g. `https://ictopdf.my`).
+To verify ownership in Google Search Console with the HTML tag method, set
+`GOOGLE_SITE_VERIFICATION` to the tag's `content` value and redeploy.
+
 ## Stack
 
 Vite + React + TypeScript, Canvas API, [pdf-lib](https://pdf-lib.js.org/).

@@ -49,12 +49,24 @@ select {
 .app {
   max-width: 640px;
   margin: 0 auto;
-  padding: 20px 16px 48px;
+  padding: 0 16px 24px;
 }
 
-header h1 {
+.site-header {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 0;
+}
+
+.site-header h1 {
   margin: 0 0 4px;
   font-size: 1.6rem;
+}
+
+.site-header h1 span {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .privacy {
@@ -554,4 +566,58 @@ button.ghost {
   aspect-ratio: 85.6 / 54;
   border-radius: 5px;
   background: var(--bg);
+}
+
+/* Static about/FAQ content below the app (plain HTML in index.html, for SEO) */
+.about {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 8px 16px 48px;
+  color: var(--text);
+}
+
+.about section {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.about h2 {
+  font-size: 1.15rem;
+  margin: 0 0 10px;
+}
+
+.about p,
+.about li {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.about ol {
+  padding-left: 20px;
+}
+
+.about li {
+  margin-bottom: 6px;
+}
+
+.about details {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+
+.about summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.about details p {
+  margin: 8px 0 0;
+}
+
+.about footer p {
+  font-size: 0.8rem;
 }

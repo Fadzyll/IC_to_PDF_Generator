@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { detectCard } from '../lib/detect'
-import { defaultQuad, orderQuad, warpCard, type Point, type Quad } from '../lib/perspective'
+import { orderQuad, warpCard, type Point, type Quad } from '../lib/perspective'
 import { ctx2d, rotate180, wipe } from '../lib/image'
 
 export interface CropResult {
@@ -150,6 +150,10 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     }
   }
 
+  // Nothing to reset if the corners and flip are as they were when the cropper opened.
+  const unchanged =
+    flipped === initial.flipped && quad.every((p, i) => p.x === initial.quad[i].x && p.y === initial.quad[i].y)
+
   const r = 11 / dispScale
   const stroke = 2.5 / dispScale
   const pts = quad.map((p) => `${p.x},${p.y}`).join(' ')
@@ -222,8 +226,32 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
           <button type="button" onClick={() => setFlipped((f) => !f)}>
             ↻ Flip 180°
           </button>
-          <button type="button" onClick={() => setQuad(defaultQuad(source.width, source.height))}>
-            Reset
+          <button
+            type="button"
+            onClick={() => {
+              setQuad([
+                { x: 0, y: 0 },
+                { x: source.width, y: 0 },
+                { x: source.width, y: source.height },
+                { x: 0, y: source.height },
+              ])
+              setNote(null)
+            }}
+            title="Use the whole photo (e.g. if it's already cropped to the card)"
+          >
+            ⛶ Full photo
+          </button>
+          <button
+            type="button"
+            disabled={unchanged}
+            onClick={() => {
+              setQuad(initial.quad)
+              setFlipped(initial.flipped)
+              setNote(null)
+            }}
+            title="Undo your changes since opening this screen"
+          >
+            ↺ Reset
           </button>
         </div>
         {note ? <p className="crop-note">{note}</p> : <p className="crop-note">Drag the 4 corners onto the card's corners.</p>}

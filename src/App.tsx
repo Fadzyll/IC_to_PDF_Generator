@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { loadImage, rotate180, wipe } from './lib/image'
 import { renderCard, CARD_H_MM, CARD_W_MM, PAD_RATIO } from './lib/card'
-import { A4_MM, CARD_CENTERS, CARD_WIDTH_MM, type CardSize } from './lib/layout'
+import { A4_MM, CARD_CENTERS, CARD_WIDTH_MM, WATERMARK_BOOST, type CardSize } from './lib/layout'
+import { applyFilter, FILTERS, type FilterId } from './lib/filters'
 import { detectCard } from './lib/detect'
 import { defaultQuad, warpCard, type Quad } from './lib/perspective'
 import {
@@ -51,7 +52,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const captureInputs = useRef<Record<Side, HTMLInputElement | null>>({ front: null, back: null })
 
-  const cards = useMemo(() => ({ front: sides.front?.card ?? null, back: sides.back?.card ?? null }), [sides])
+  const [filter, setFilter] = useState<FilterId>('enhance')
+  // Straightened cards with the chosen filter applied (recomputed only when those change).
+  const cards = useMemo(
+    () => ({
+      front: sides.front ? applyFilter(sides.front.card, filter) : null,
+      back: sides.back ? applyFilter(sides.back.card, filter) : null,
+    }),
+    [sides, filter],
+  )
+  const wmFor = (s: CardSize) => ({ ...wm, scale: wm.scale * WATERMARK_BOOST[s] })
   const ready = cards.front !== null && cards.back !== null
   const update = <K extends keyof WatermarkOptions>(k: K, v: WatermarkOptions[K]) => setWm((p) => ({ ...p, [k]: v }))
 
@@ -132,13 +142,15 @@ export default function App() {
   }
 
   async function makePdfFile(): Promise<File> {
-    const rendered = SIDES.map((s) => renderCard(cards[s]!, wm, EXPORT_PX))
+    const rendered = SIDES.map((s) => renderCard(cards[s]!, wmFor(size), EXPORT_PX))
     try {
       // pdf-lib is large, so load it only when it's needed.
       const { buildPdf } = await import('./lib/pdf')
       const bytes = await buildPdf(rendered, size)
       const slug = wm.text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'copy'
-      return new File([bytes as BlobPart], `IC-${slug}.pdf`, { type: 'application/pdf' })
+      const d = new Date()
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return new File([bytes as BlobPart], `IC-${slug}-${date}.pdf`, { type: 'application/pdf' })
     } finally {
       rendered.forEach((c) => wipe(c.canvas))
     }
@@ -212,7 +224,12 @@ export default function App() {
       </section>
 
       <section className="panel">
-        <h2>2. Watermark</h2>
+        <h2>2. Enhance</h2>
+        <FilterPicker sides={sides} value={filter} onChange={setFilter} />
+      </section>
+
+      <section className="panel">
+        <h2>3. Watermark</h2>
         <label className="field">
           <span>Caption</span>
           <input
@@ -267,7 +284,7 @@ export default function App() {
       </section>
 
       <section className="panel">
-        <h2>3. Preview</h2>
+        <h2>4. Preview</h2>
         <div className="segmented" role="group" aria-label="Card size">
           <button type="button" aria-pressed={size === 'enlarged'} onClick={() => setSize('enlarged')}>
             Enlarged
@@ -276,7 +293,7 @@ export default function App() {
             Actual size
           </button>
         </div>
-        <A4Preview cards={cards} wm={wm} size={size} />
+        <A4Preview cards={cards} wm={wmFor(size)} size={size} />
       </section>
 
       {error && <p className="error">{error}</p>}
@@ -380,6 +397,39 @@ function CaptureSlot(props: {
       {/* Fallback when live camera isn't available: the OS camera app. */}
       <input ref={captureRef} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} />
+    </div>
+  )
+}
+
+/** Filter chips with live thumbnails of the user's own card, like a scanner app. */
+function FilterPicker({ sides, value, onChange }: { sides: Sides; value: FilterId; onChange: (f: FilterId) => void }) {
+  const base = sides.front?.card ?? sides.back?.card ?? null
+  const thumbs = useMemo(() => {
+    if (!base) return null
+    const small = document.createElement('canvas')
+    small.width = 240
+    small.height = Math.round((240 * base.height) / base.width)
+    const ctx = small.getContext('2d')!
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(base, 0, 0, small.width, small.height)
+    return Object.fromEntries(FILTERS.map((f) => [f.id, applyFilter(small, f.id)])) as Record<FilterId, HTMLCanvasElement>
+  }, [base])
+
+  return (
+    <div className="filters" role="group" aria-label="Colour filter">
+      {FILTERS.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          className={value === f.id ? 'filter active' : 'filter'}
+          aria-pressed={value === f.id}
+          title={f.hint}
+          onClick={() => onChange(f.id)}
+        >
+          {thumbs ? <CanvasView source={thumbs[f.id]} className="filter-thumb" /> : <span className="filter-thumb empty" />}
+          <span>{f.label}</span>
+        </button>
+      ))}
     </div>
   )
 }

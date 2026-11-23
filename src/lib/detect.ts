@@ -77,21 +77,24 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
   // Edge threshold: start strict (top 12% of gradients) and relax it if nothing
   // is found. Strong text edges on the card can otherwise drown out a faint
   // card border, e.g. a light card on a light table.
-  for (const pct of [0.88, 0.75, 0.6]) {
-    const q = findQuad(Math.max(30, sample[Math.floor(sample.length * pct)]))
-    if (q) {
-      // Pull corners ~0.7% towards the centre so no background sliver shows.
-      const cx = q.reduce((s, p) => s + p.x, 0) / 4
-      const cy = q.reduce((s, p) => s + p.y, 0) / 4
-      return q.map((p) => ({
-        x: Math.min(src.width, Math.max(0, (p.x + (cx - p.x) * 0.007) / scale)),
-        y: Math.min(src.height, Math.max(0, (p.y + (cy - p.y) * 0.007) / scale)),
-      })) as Quad
+  // Prefer four real edges at any threshold before inferring a missing one.
+  for (const inferMissing of [false, true]) {
+    for (const pct of [0.88, 0.75, 0.6]) {
+      const q = findQuad(Math.max(30, sample[Math.floor(sample.length * pct)]), inferMissing)
+      if (q) {
+        // Pull corners ~0.7% towards the centre so no background sliver shows.
+        const cx = q.reduce((s, p) => s + p.x, 0) / 4
+        const cy = q.reduce((s, p) => s + p.y, 0) / 4
+        return q.map((p) => ({
+          x: Math.min(src.width, Math.max(0, (p.x + (cx - p.x) * 0.007) / scale)),
+          y: Math.min(src.height, Math.max(0, (p.y + (cy - p.y) * 0.007) / scale)),
+        })) as Quad
+      }
     }
   }
   return null
 
-  function findQuad(thr: number): Quad | null {
+  function findQuad(thr: number, inferMissing: boolean): Quad | null {
     const isEdge = (x: number, y: number) => {
       const xi = Math.round(x)
       const yi = Math.round(y)
@@ -207,7 +210,8 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
         if (vert.length < 14) vert.push(l)
       }
     }
-    if (horiz.length < 2 || vert.length < 2) return null
+    // Need at least 3 lines (the 4th can be inferred, see the fallback below).
+    if (!horiz.length || !vert.length || horiz.length + vert.length < (inferMissing ? 3 : 4)) return null
 
     const intersect = (a: Line, b: Line): Point | null => {
       const det = Math.cos(a.theta) * Math.sin(b.theta) - Math.sin(a.theta) * Math.cos(b.theta)
@@ -227,51 +231,90 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
     const cardRatio = CARD_W_MM / CARD_H_MM
     const margin = 0.03 * Math.max(w, h)
     const regionSmall = region?.map((p) => ({ x: p.x * scale, y: p.y * scale }))
-    let best: { q: Quad; score: number } | null = null
+    // A holder object, since `best` is updated inside the evaluate() closure.
+    const found: { best: { q: Quad; score: number } | null } = { best: null }
+
+    /**
+     * Check a candidate quad and score it. With `oneWeakEdge`, the weakest edge
+     * is allowed to be invisible (its corners were inferred from the card's
+     * shape), so it's excluded from the checks and the score.
+     */
+    const evaluate = (pts: (Point | null)[], oneWeakEdge: boolean) => {
+      if (pts.some((p) => !p || p.x < -margin || p.y < -margin || p.x > w + margin || p.y > h + margin)) return
+      const q = orderQuad(pts as Point[])
+      const top = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y)
+      const bot = Math.hypot(q[2].x - q[3].x, q[2].y - q[3].y)
+      const left = Math.hypot(q[3].x - q[0].x, q[3].y - q[0].y)
+      const right = Math.hypot(q[2].x - q[1].x, q[2].y - q[1].y)
+      if (Math.min(top, bot, left, right) < Math.min(w, h) * 0.15) return
+      // Allow for perspective: opposite edges within 35% of each other.
+      if (Math.min(top, bot) / Math.max(top, bot) < 0.65 || Math.min(left, right) / Math.max(left, right) < 0.65) return
+      const ratio = (top + bot) / (left + right)
+      if (ratio < cardRatio * 0.72 || ratio > cardRatio * 1.35) return
+      const area = 0.5 * Math.abs(q.reduce((s, p, n) => s + p.x * q[(n + 1) % 4].y - q[(n + 1) % 4].x * p.y, 0))
+      if (area < w * h * 0.08) return
+
+      const s = [support(q[0], q[1]), support(q[1], q[2]), support(q[2], q[3]), support(q[3], q[0])]
+      const cst = [contrast(q[0], q[1]), contrast(q[1], q[2]), contrast(q[2], q[3]), contrast(q[3], q[0])]
+      const lens = [top, right, bot, left]
+      const quality = lens.map((_, n) => (s[n] * Math.min(1, cst[n].diff / 60)) / (1 + cst[n].spread / 25))
+      const weak = oneWeakEdge ? quality.indexOf(Math.min(...quality)) : -1
+      const edges = [0, 1, 2, 3].filter((n) => n !== weak)
+      if (Math.min(...edges.map((n) => s[n])) < 0.35) return
+      if (Math.min(...edges.map((n) => cst[n].diff)) < 14) return
+      let score = edges.reduce((sum, n) => sum + lens[n] * quality[n], 0)
+      if (oneWeakEdge) score *= 0.7
+      // Prefer quads near the camera guide frame, if one was given.
+      if (regionSmall) {
+        const off = q.reduce((sum, p, n) => sum + Math.hypot(p.x - regionSmall[n].x, p.y - regionSmall[n].y), 0) / 4
+        score *= 1 / (1 + off / (0.25 * Math.max(w, h)))
+      }
+      if (!found.best || score > found.best.score) found.best = { q, score }
+    }
 
     for (let i = 0; i < horiz.length; i++)
       for (let j = i + 1; j < horiz.length; j++)
         for (let k = 0; k < vert.length; k++)
-          for (let l = k + 1; l < vert.length; l++) {
-            const pts = [
-              intersect(horiz[i], vert[k]),
-              intersect(horiz[i], vert[l]),
-              intersect(horiz[j], vert[l]),
-              intersect(horiz[j], vert[k]),
-            ]
-            if (pts.some((p) => !p || p.x < -margin || p.y < -margin || p.x > w + margin || p.y > h + margin)) continue
-            const q = orderQuad(pts as Point[])
-            const top = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y)
-            const bot = Math.hypot(q[2].x - q[3].x, q[2].y - q[3].y)
-            const left = Math.hypot(q[3].x - q[0].x, q[3].y - q[0].y)
-            const right = Math.hypot(q[2].x - q[1].x, q[2].y - q[1].y)
-            if (Math.min(top, bot, left, right) < Math.min(w, h) * 0.15) continue
-            // Allow for perspective: opposite edges within 35% of each other.
-            if (Math.min(top, bot) / Math.max(top, bot) < 0.65 || Math.min(left, right) / Math.max(left, right) < 0.65) continue
-            const ratio = (top + bot) / (left + right)
-            if (ratio < cardRatio * 0.72 || ratio > cardRatio * 1.35) continue
-            const area = 0.5 * Math.abs(
-              q.reduce((s, p, n) => s + p.x * q[(n + 1) % 4].y - q[(n + 1) % 4].x * p.y, 0),
+          for (let l = k + 1; l < vert.length; l++)
+            evaluate(
+              [intersect(horiz[i], vert[k]), intersect(horiz[i], vert[l]), intersect(horiz[j], vert[l]), intersect(horiz[j], vert[k])],
+              false,
             )
-            if (area < w * h * 0.08) continue
+    if (found.best || !inferMissing) return found.best?.q ?? null
 
-            const s = [support(q[0], q[1]), support(q[1], q[2]), support(q[2], q[3]), support(q[3], q[0])]
-            if (Math.min(...s) < 0.35) continue
-            const cst = [contrast(q[0], q[1]), contrast(q[1], q[2]), contrast(q[2], q[3]), contrast(q[3], q[0])]
-            if (Math.min(...cst.map((c) => c.diff)) < 14) continue
-            const lens = [top, right, bot, left]
-            let score = lens.reduce(
-              (sum, len, n) => sum + (len * s[n] * Math.min(1, cst[n].diff / 60)) / (1 + cst[n].spread / 25),
-              0,
-            )
-            // Prefer quads near the camera guide frame, if one was given.
-            if (regionSmall) {
-              const off = q.reduce((sum, p, n) => sum + Math.hypot(p.x - regionSmall[n].x, p.y - regionSmall[n].y), 0) / 4
-              score *= 1 / (1 + off / (0.25 * Math.max(w, h)))
-            }
-            if (!best || score > best.score) best = { q, score }
+    // Fallback: one edge is invisible (e.g. in shadow against a dark table).
+    // A card's proportions are fixed, so infer the missing edge from the other three.
+    const along = (l: Line, sign: number): Point => ({ x: -Math.sin(l.theta) * sign, y: Math.cos(l.theta) * sign })
+    const step = (p: Point | null, d: Point, len: number) => (p ? { x: p.x + d.x * len, y: p.y + d.y * len } : null)
+    for (const sign of [1, -1]) {
+      // Two horizontals + one vertical: infer the other vertical.
+      for (let i = 0; i < horiz.length; i++)
+        for (let j = i + 1; j < horiz.length; j++)
+          for (const v of vert) {
+            const a = intersect(horiz[i], v)
+            const b = intersect(horiz[j], v)
+            if (!a || !b) continue
+            const len = Math.hypot(a.x - b.x, a.y - b.y) * cardRatio
+            const da = along(horiz[i], sign)
+            let db = along(horiz[j], sign)
+            if (da.x * db.x + da.y * db.y < 0) db = { x: -db.x, y: -db.y }
+            evaluate([a, step(a, da, len), step(b, db, len), b], true)
           }
+      // Two verticals + one horizontal: infer the other horizontal.
+      for (let k = 0; k < vert.length; k++)
+        for (let l = k + 1; l < vert.length; l++)
+          for (const hz of horiz) {
+            const a = intersect(hz, vert[k])
+            const b = intersect(hz, vert[l])
+            if (!a || !b) continue
+            const len = Math.hypot(a.x - b.x, a.y - b.y) / cardRatio
+            const da = along(vert[k], sign)
+            let db = along(vert[l], sign)
+            if (da.x * db.x + da.y * db.y < 0) db = { x: -db.x, y: -db.y }
+            evaluate([a, b, step(b, db, len), step(a, da, len)], true)
+          }
+    }
 
-    return best?.q ?? null
+    return (found.best as { q: Quad } | null)?.q ?? null
   }
 }

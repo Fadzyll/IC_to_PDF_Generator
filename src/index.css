@@ -520,3 +520,38 @@ button.ghost {
     transform: rotate(360deg);
   }
 }
+
+/* Filter picker */
+.filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.filter {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  width: 96px;
+  font-size: 0.75rem;
+  border-radius: 10px;
+}
+
+.filter.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.filter-thumb {
+  display: block;
+  width: 84px;
+  aspect-ratio: 85.6 / 54;
+  border-radius: 5px;
+  background: var(--bg);
+}

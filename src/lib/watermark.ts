@@ -63,7 +63,7 @@ function drawBanner(
   minLength: number,
   repeatText = false,
 ) {
-  const fontSize = cardW * 0.03 * opts.scale
+  const fontSize = cardW * 0.034 * opts.scale
   const gap = fontSize * 1.9 // distance between the two lines
   const lineWidth = Math.max(1, fontSize * 0.13)
 

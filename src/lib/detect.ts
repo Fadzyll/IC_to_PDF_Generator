@@ -1,3 +1,4 @@
+import { ctx2d } from './image'
 import { CARD_H_MM, CARD_W_MM } from './card'
 import { orderQuad, type Point, type Quad } from './perspective'
 
@@ -26,9 +27,10 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
-  const ctx = c.getContext('2d', { willReadFrequently: true })!
+  const ctx = ctx2d(c, { willReadFrequently: true })
   ctx.drawImage(src, 0, 0, w, h)
   const rgba = ctx.getImageData(0, 0, w, h).data
+  c.width = c.height = 0 // pixels copied out; free the scratch canvas
 
   // Per-channel copies, blurred twice with a 3×3 box (edges clamped, so the
   // photo's border doesn't turn into a fake edge).

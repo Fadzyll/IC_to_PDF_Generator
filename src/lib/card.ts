@@ -1,3 +1,4 @@
+import { ctx2d } from './image'
 import { drawWatermark, type WatermarkOptions } from './watermark'
 
 /** ISO/IEC 7810 ID-1 card size (MyKad), in mm. */
@@ -29,7 +30,7 @@ export function renderCard(
   const canvas = document.createElement('canvas')
   canvas.width = cardW + pad * 2
   canvas.height = cardH + pad * 2
-  const ctx = canvas.getContext('2d')!
+  const ctx = ctx2d(canvas)
 
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)

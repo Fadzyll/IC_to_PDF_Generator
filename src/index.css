@@ -656,3 +656,15 @@ button.ghost {
   font-size: 0.9rem;
   color: var(--text);
 }
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.error p {
+  margin: 0;
+  flex: 1 1 220px;
+}

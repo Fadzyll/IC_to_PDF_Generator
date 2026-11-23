@@ -1,3 +1,4 @@
+import { ctx2d } from './image'
 /**
  * Scanner-style image filters (like CamScanner's), applied to the
  * straightened card. All processing is local, on canvas pixels.
@@ -23,7 +24,7 @@ export function applyFilter(src: HTMLCanvasElement, id: FilterId): HTMLCanvasEle
   const out = document.createElement('canvas')
   out.width = w
   out.height = h
-  const ctx = out.getContext('2d')!
+  const ctx = ctx2d(out)
   ctx.drawImage(src, 0, 0)
   const img = ctx.getImageData(0, 0, w, h)
   const d = img.data

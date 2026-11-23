@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadImage, rotate180, wipe } from './lib/image'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { CanvasMemoryError, ctx2d, loadImage, rotate180, wipe } from './lib/image'
 import { renderCard, CARD_H_MM, CARD_W_MM, PAD_RATIO } from './lib/card'
 import { A4_MM, CARD_CENTERS, CARD_WIDTH_MM, WATERMARK_BOOST, type CardSize } from './lib/layout'
 import { applyFilter, FILTERS, type FilterId } from './lib/filters'
@@ -24,6 +24,53 @@ const SUPPORT_URL = 'https://sociabuzz.com/fadzyll007/tribe'
 /** Card width in px for on-screen preview vs. final PDF. */
 const PREVIEW_PX = 700
 const EXPORT_PX = 1600
+/** Fallback if the phone runs out of image memory at full size. */
+const EXPORT_PX_LOW = 1100
+
+/** The PDF code is loaded on demand; a redeploy can remove the old file a stale page asks for. */
+const isChunkLoadError = (e: unknown) =>
+  /dynamically imported module|Importing a module script failed|error loading dynamically|Failed to fetch/i.test(
+    (e as Error)?.message ?? '',
+  )
+
+/** Turn a failure into a message that says what happened and what to do. */
+function describeError(e: unknown, action: string): { message: string; reload?: boolean } {
+  if (e instanceof CanvasMemoryError) {
+    return {
+      message: `Your phone ran out of memory while ${action}. Close other tabs or apps and try again. If it still fails, reload the page.`,
+      reload: true,
+    }
+  }
+  if (isChunkLoadError(e)) {
+    return { message: 'The app was just updated. Please reload the page and try again.', reload: true }
+  }
+  const err = e as Error
+  const detail = err?.message ? ` (${err.name}: ${err.message.slice(0, 120)})` : ''
+  return { message: `Something went wrong while ${action}.${detail}`, reload: true }
+}
+
+/** Run image work during render without crashing the page if memory runs out. */
+function tryCanvas<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn()
+  } catch (e) {
+    console.error(e)
+    return fallback
+  }
+}
+
+/**
+ * Free canvases from the previous render once they've been replaced. Safari is
+ * slow to release canvas memory by itself and has a low limit on iPhones.
+ */
+function useReleaseReplaced(current: (HTMLCanvasElement | null)[], keep: (HTMLCanvasElement | null | undefined)[] = []) {
+  const prev = useRef<HTMLCanvasElement[]>([])
+  useEffect(() => {
+    const now = current.filter((c): c is HTMLCanvasElement => !!c)
+    for (const c of prev.current) if (!now.includes(c) && !keep.includes(c)) wipe(c)
+    prev.current = now
+  })
+}
 
 interface SideState {
   /** Original photo (downscaled), kept so the crop can be edited again. */
@@ -52,7 +99,7 @@ export default function App() {
   const [wm, setWm] = useState<WatermarkOptions>(DEFAULT_WATERMARK)
   const [size, setSize] = useState<CardSize>('enlarged')
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; reload?: boolean } | null>(null)
   // Set after a PDF is downloaded or shared, to show a small thank-you / support note.
   const [done, setDone] = useState(false)
   const captureInputs = useRef<Record<Side, HTMLInputElement | null>>({ front: null, back: null })
@@ -61,20 +108,28 @@ export default function App() {
   // Straightened cards with the chosen filter applied (recomputed only when those change).
   const cards = useMemo(
     () => ({
-      front: sides.front ? applyFilter(sides.front.card, filter) : null,
-      back: sides.back ? applyFilter(sides.back.card, filter) : null,
+      // If filtering fails (out of memory), fall back to the unfiltered card.
+      front: sides.front ? tryCanvas(() => applyFilter(sides.front!.card, filter), sides.front.card) : null,
+      back: sides.back ? tryCanvas(() => applyFilter(sides.back!.card, filter), sides.back.card) : null,
     }),
     [sides, filter],
   )
+  // Free filtered copies when they're replaced (but never the original straightened cards).
+  useReleaseReplaced([cards.front, cards.back], [sides.front?.card, sides.back?.card])
   const wmFor = (s: CardSize) => ({ ...wm, scale: wm.scale * WATERMARK_BOOST[s] })
   const ready = cards.front !== null && cards.back !== null
+
+  // Load the PDF code as soon as both photos are in, so a later redeploy can't break the download.
+  useEffect(() => {
+    if (ready) import('./lib/pdf').catch(() => {})
+  }, [ready])
   const update = <K extends keyof WatermarkOptions>(k: K, v: WatermarkOptions[K]) => setWm((p) => ({ ...p, [k]: v }))
 
   /** A new photo arrived (camera or file): find the card, then open the cropper. */
   async function startCrop(side: Side, source: HTMLCanvasElement, guide?: Quad) {
     setBusy('Finding card edges…')
     await nextFrame()
-    const quad = detectCard(source, guide) ?? guide ?? defaultQuad(source.width, source.height)
+    const quad = tryCanvas(() => detectCard(source, guide), null) ?? guide ?? defaultQuad(source.width, source.height)
     setBusy(null)
     setOverlay({ kind: 'crop', side, source, initial: { quad, flipped: false } })
   }
@@ -87,7 +142,7 @@ export default function App() {
       await startCrop(side, img)
     } catch {
       setBusy(null)
-      setError('Could not read that image. Please try another photo.')
+      setError({ message: 'Could not read that image. Please try another photo.' })
     }
   }
 
@@ -100,12 +155,21 @@ export default function App() {
   async function onCropDone(side: Side, source: HTMLCanvasElement, crop: CropResult) {
     setOverlay(null)
     setBusy('Straightening…')
+    setError(null)
     await nextFrame()
-    let card = warpCard(source, crop.quad)
-    if (crop.flipped) {
-      const f = rotate180(card)
-      wipe(card)
-      card = f
+    let card: HTMLCanvasElement
+    try {
+      card = warpCard(source, crop.quad)
+      if (crop.flipped) {
+        const f = rotate180(card)
+        wipe(card)
+        card = f
+      }
+    } catch (e) {
+      console.error(e)
+      setBusy(null)
+      setError(describeError(e, 'straightening the photo'))
+      return
     }
     const old = sides[side]
     if (old) {
@@ -148,18 +212,22 @@ export default function App() {
   }
 
   async function makePdfFile(): Promise<File> {
-    const rendered = SIDES.map((s) => renderCard(cards[s]!, wmFor(size), EXPORT_PX))
+    // pdf-lib is large, so it's loaded on demand (usually already preloaded above).
+    const { buildPdf } = await import('./lib/pdf')
+    const build = (px: number) => buildPdf(SIDES.map((s) => () => renderCard(cards[s]!, wmFor(size), px)), size)
+    let bytes: Uint8Array
     try {
-      // pdf-lib is large, so load it only when it's needed.
-      const { buildPdf } = await import('./lib/pdf')
-      const bytes = await buildPdf(rendered, size)
-      const slug = wm.text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'copy'
-      const d = new Date()
-      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      return new File([bytes as BlobPart], `IC-${slug}-${date}.pdf`, { type: 'application/pdf' })
-    } finally {
-      rendered.forEach((c) => wipe(c.canvas))
+      bytes = await build(EXPORT_PX)
+    } catch (e) {
+      // Out of image memory (typically iPhone Safari): try again at a lower resolution.
+      if (!(e instanceof CanvasMemoryError)) throw e
+      await nextFrame()
+      bytes = await build(EXPORT_PX_LOW)
     }
+    const slug = wm.text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'copy'
+    const d = new Date()
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return new File([bytes as BlobPart], `IC-${slug}-${date}.pdf`, { type: 'application/pdf' })
   }
 
   async function onDownload() {
@@ -174,8 +242,9 @@ export default function App() {
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
       setDone(true)
-    } catch {
-      setError('Something went wrong generating the PDF.')
+    } catch (e) {
+      console.error(e)
+      setError(describeError(e, 'generating the PDF'))
     } finally {
       setBusy(null)
     }
@@ -192,10 +261,13 @@ export default function App() {
         await navigator.share({ files: [file], title: file.name })
         setDone(true)
       } else {
-        setError('Sharing files is not supported on this browser. Use Download instead.')
+        setError({ message: 'Sharing files is not supported on this browser. Use Download instead.' })
       }
     } catch (e) {
-      if ((e as Error)?.name !== 'AbortError') setError('Could not share the PDF.')
+      if ((e as Error)?.name !== 'AbortError') {
+        console.error(e)
+        setError(describeError(e, 'sharing the PDF'))
+      }
     } finally {
       setBusy(null)
     }
@@ -299,7 +371,16 @@ export default function App() {
         <A4Preview cards={cards} wm={wmFor(size)} size={size} />
       </section>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <div className="error" role="alert">
+          <p>{error.message}</p>
+          {error.reload && (
+            <button type="button" onClick={() => location.reload()}>
+              Reload page
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="actions">
         <button type="button" className="primary" disabled={!ready || !!busy} onClick={onDownload}>
@@ -384,7 +465,7 @@ function CaptureSlot(props: {
       <div className="slot-body">
         {card ? (
           <button type="button" className="thumb-btn" onClick={onEdit} aria-label={`Edit ${label} crop`}>
-            <CanvasView source={card} className="thumb" />
+            <CanvasView source={card} className="thumb" maxWidth={640} />
           </button>
         ) : (
           <div className="placeholder">No photo yet</div>
@@ -423,11 +504,15 @@ function FilterPicker({ sides, value, onChange }: { sides: Sides; value: FilterI
     const small = document.createElement('canvas')
     small.width = 240
     small.height = Math.round((240 * base.height) / base.width)
-    const ctx = small.getContext('2d')!
+    const ctx = ctx2d(small)
     ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(base, 0, 0, small.width, small.height)
-    return Object.fromEntries(FILTERS.map((f) => [f.id, applyFilter(small, f.id)])) as Record<FilterId, HTMLCanvasElement>
+    return tryCanvas(
+      () => Object.fromEntries(FILTERS.map((f) => [f.id, applyFilter(small, f.id)])) as Record<FilterId, HTMLCanvasElement>,
+      null,
+    )
   }, [base])
+  useReleaseReplaced(thumbs ? Object.values(thumbs) : [])
 
   return (
     <div className="filters" role="group" aria-label="Colour filter">
@@ -449,10 +534,13 @@ function FilterPicker({ sides, value, onChange }: { sides: Sides; value: FilterI
 }
 
 function A4Preview({ cards, wm, size }: { cards: Record<Side, HTMLCanvasElement | null>; wm: WatermarkOptions; size: CardSize }) {
+  // While a slider is being dragged, let the preview lag behind instead of re-rendering on every step.
+  const deferredWm = useDeferredValue(wm)
   const rendered = useMemo(
-    () => SIDES.map((s) => (cards[s] ? renderCard(cards[s]!, wm, PREVIEW_PX).canvas : null)),
-    [cards, wm],
+    () => SIDES.map((s) => (cards[s] ? tryCanvas(() => renderCard(cards[s]!, deferredWm, PREVIEW_PX).canvas, null) : null)),
+    [cards, deferredWm],
   )
+  useReleaseReplaced(rendered)
 
   // Layout in % of the A4 page, matching the PDF exactly.
   const imgWmm = CARD_WIDTH_MM[size] * (1 + PAD_RATIO * 2)
@@ -480,14 +568,36 @@ function A4Preview({ cards, wm, size }: { cards: Record<Side, HTMLCanvasElement 
 }
 
 /** Displays an offscreen canvas by copying it into an on-screen one. */
-function CanvasView({ source, className, style }: { source: HTMLCanvasElement; className?: string; style?: React.CSSProperties }) {
+function CanvasView({
+  source,
+  className,
+  style,
+  maxWidth = Infinity,
+}: {
+  source: HTMLCanvasElement
+  className?: string
+  style?: React.CSSProperties
+  /** Store at most this many px wide (thumbnails don't need the full-size image). */
+  maxWidth?: number
+}) {
   const ref = useRef<HTMLCanvasElement>(null)
+  // Free the on-screen copy when this view goes away.
+  useEffect(() => {
+    const c = ref.current // captured now: React clears refs before unmount cleanups run
+    return () => {
+      if (c) c.width = c.height = 0
+    }
+  }, [])
   useEffect(() => {
     const c = ref.current
     if (!c) return
-    c.width = source.width
-    c.height = source.height
-    c.getContext('2d')!.drawImage(source, 0, 0)
-  }, [source])
+    // A throw inside an effect would take down the whole page; leave the view blank instead.
+    tryCanvas(() => {
+      const scale = Math.min(1, maxWidth / source.width)
+      c.width = Math.round(source.width * scale)
+      c.height = Math.round(source.height * scale)
+      ctx2d(c).drawImage(source, 0, 0, c.width, c.height)
+    }, undefined)
+  }, [source, maxWidth])
   return <canvas ref={ref} className={className} style={style} />
 }

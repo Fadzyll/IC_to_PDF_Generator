@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { detectCard } from '../lib/detect'
 import { defaultQuad, orderQuad, warpCard, type Point, type Quad } from '../lib/perspective'
-import { rotate180 } from '../lib/image'
+import { ctx2d, rotate180, wipe } from '../lib/image'
 
 export interface CropResult {
   quad: Quad
@@ -36,8 +36,22 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     const c = imgRef.current!
     c.width = source.width
     c.height = source.height
-    c.getContext('2d')!.drawImage(source, 0, 0)
+    // Effects must not throw (it would crash the page), e.g. when out of canvas memory.
+    try {
+      ctx2d(c).drawImage(source, 0, 0)
+    } catch (e) {
+      console.error(e)
+    }
   }, [source])
+
+  // Free the on-screen copies of the photo when the cropper closes.
+  useEffect(() => {
+    // Capture the elements now: React clears refs before unmount cleanups run.
+    const els = [imgRef.current, previewRef.current, loupeRef.current]
+    return () => {
+      for (const c of els) if (c) c.width = c.height = 0
+    }
+  }, [])
 
   // Track on-screen scale so handles stay a constant finger-friendly size.
   useEffect(() => {
@@ -54,11 +68,17 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     if (drag !== null) return
     const c = previewRef.current
     if (!c) return
-    let out = warpCard(source, orderQuad(quad), 360, 227)
-    if (flipped) out = rotate180(out)
-    c.width = out.width
-    c.height = out.height
-    c.getContext('2d')!.drawImage(out, 0, 0)
+    try {
+      const warped = warpCard(source, orderQuad(quad), 360, 227)
+      const out = flipped ? rotate180(warped) : warped
+      c.width = out.width
+      c.height = out.height
+      ctx2d(c).drawImage(out, 0, 0)
+      wipe(warped)
+      wipe(out)
+    } catch (e) {
+      console.error(e) // preview only; the crop itself still works
+    }
   }, [source, quad, flipped, drag])
 
   const toSource = useCallback(
@@ -78,7 +98,7 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     const dpr = window.devicePixelRatio || 1
     c.width = LOUPE * dpr
     c.height = LOUPE * dpr
-    const ctx = c.getContext('2d')!
+    const ctx = ctx2d(c)
     const span = LOUPE / (ZOOM * dispScale) // source px shown across the loupe
     ctx.fillStyle = '#000'
     ctx.fillRect(0, 0, c.width, c.height)

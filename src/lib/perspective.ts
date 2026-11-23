@@ -1,3 +1,4 @@
+import { ctx2d } from './image'
 import { CARD_H_MM, CARD_W_MM } from './card'
 
 export interface Point {
@@ -76,12 +77,12 @@ export const WARP_H = Math.round((WARP_W * CARD_H_MM) / CARD_W_MM)
 export function warpCard(src: HTMLCanvasElement, quad: Quad, outW = WARP_W, outH = WARP_H): HTMLCanvasElement {
   const sw = src.width
   const sh = src.height
-  const sdata = src.getContext('2d')!.getImageData(0, 0, sw, sh).data
+  const sdata = ctx2d(src).getImageData(0, 0, sw, sh).data
 
   const out = document.createElement('canvas')
   out.width = outW
   out.height = outH
-  const octx = out.getContext('2d')!
+  const octx = ctx2d(out)
   const img = octx.createImageData(outW, outH)
   const o = img.data
 

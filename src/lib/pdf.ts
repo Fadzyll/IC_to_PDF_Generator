@@ -1,5 +1,6 @@
 import { PDFDocument } from 'pdf-lib'
 import { PAD_RATIO, type RenderedCard } from './card'
+import { CanvasMemoryError, wipe } from './image'
 import { A4_MM, CARD_CENTERS, CARD_WIDTH_MM, type CardSize } from './layout'
 
 const MM_TO_PT = 72 / 25.4
@@ -8,7 +9,8 @@ function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
-        if (!blob) return reject(new Error('Could not encode image'))
+        // Safari returns null here when it's out of canvas memory.
+        if (!blob) return reject(new CanvasMemoryError())
         blob.arrayBuffer().then((b) => resolve(new Uint8Array(b)), reject)
       },
       'image/jpeg',
@@ -17,8 +19,12 @@ function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   })
 }
 
-/** Build an A4 PDF with the front card on top and the back card below. */
-export async function buildPdf(cards: RenderedCard[], size: CardSize): Promise<Uint8Array> {
+/**
+ * Build an A4 PDF with the front card on top and the back card below.
+ * Cards are rendered one at a time and freed right after embedding, to keep
+ * peak memory low (iPhone Safari has a small canvas memory limit).
+ */
+export async function buildPdf(renderers: (() => RenderedCard)[], size: CardSize): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   doc.setTitle('IC copy')
   doc.setProducer('IC to PDF Generator')
@@ -32,10 +38,17 @@ export async function buildPdf(cards: RenderedCard[], size: CardSize): Promise<U
   // The rendered canvas includes padding on both sides of the card.
   const imgWpt = cardWpt * (1 + PAD_RATIO * 2)
 
-  for (let i = 0; i < cards.length; i++) {
-    const { canvas } = cards[i]
-    const jpg = await doc.embedJpg(await canvasToJpeg(canvas))
-    const imgHpt = imgWpt * (canvas.height / canvas.width)
+  for (let i = 0; i < renderers.length; i++) {
+    const { canvas } = renderers[i]()
+    let jpgBytes: Uint8Array
+    const ratio = canvas.height / canvas.width
+    try {
+      jpgBytes = await canvasToJpeg(canvas)
+    } finally {
+      wipe(canvas)
+    }
+    const jpg = await doc.embedJpg(jpgBytes)
+    const imgHpt = imgWpt * ratio
     const cx = pageW / 2
     // pdf-lib's origin is bottom-left.
     const cy = pageH * (1 - CARD_CENTERS[i])

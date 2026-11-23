@@ -1,0 +1,293 @@
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --text: #1a1f2b;
+  --muted: #5d6677;
+  --border: #dde2ea;
+  --accent: #1f5fd1;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --page-shadow: 0 2px 12px rgba(20, 30, 50, 0.15);
+  color-scheme: light;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151c;
+    --surface: #1b2029;
+    --text: #e8ebf1;
+    --muted: #9aa3b5;
+    --border: #2d3442;
+    --accent: #5b8ff0;
+    --accent-text: #0b0e14;
+    --danger: #ff7b6b;
+    --page-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+}
+
+.privacy {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+/* Capture slots */
+.slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 420px) {
+  .slots {
+    grid-template-columns: 1fr;
+  }
+}
+
+.slot {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.slot-head {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.slot-body {
+  aspect-ratio: 85.6 / 54;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 40px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+/* Form fields */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.field input[type='text'],
+.field select {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--text);
+}
+
+.field input[type='color'] {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 2px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  border-radius: 999px;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+}
+
+/* Segmented control */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.segmented button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* A4 preview: always white, like paper */
+.a4 {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  background: #ffffff;
+  box-shadow: var(--page-shadow);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.a4-card {
+  position: absolute;
+  display: block;
+}
+
+.a4-empty {
+  display: grid;
+  place-items: center;
+  color: #9aa3b5;
+  font-size: 0.85rem;
+  border: 2px dashed #d6dbe4;
+  border-radius: 8px;
+  /* the empty box shows the card area, not the padding */
+  background-clip: content-box;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions .primary {
+  flex: 1 1 160px;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0 0 12px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 8px;
+}

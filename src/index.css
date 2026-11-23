@@ -621,3 +621,38 @@ button.ghost {
 .about footer p {
   font-size: 0.8rem;
 }
+
+/* Thank-you / support note after a PDF is made */
+.support-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.92rem;
+}
+
+.support-note span:first-child {
+  font-weight: 600;
+  color: #1e8e4e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .support-note span:first-child {
+    color: #5fd38d;
+  }
+}
+
+.support-note a,
+.about .support a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.about footer p.support {
+  font-size: 0.9rem;
+  color: var(--text);
+}

@@ -18,6 +18,9 @@ type Side = 'front' | 'back'
 const SIDES: Side[] = ['front', 'back']
 const LABEL: Record<Side, string> = { front: 'Front', back: 'Back' }
 
+/** Donation page. A plain link only: no third-party scripts on a page that handles IC photos. */
+const SUPPORT_URL = 'https://sociabuzz.com/fadzyll007/tribe'
+
 /** Card width in px for on-screen preview vs. final PDF. */
 const PREVIEW_PX = 700
 const EXPORT_PX = 1600
@@ -50,6 +53,8 @@ export default function App() {
   const [size, setSize] = useState<CardSize>('enlarged')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Set after a PDF is downloaded or shared, to show a small thank-you / support note.
+  const [done, setDone] = useState(false)
   const captureInputs = useRef<Record<Side, HTMLInputElement | null>>({ front: null, back: null })
 
   const [filter, setFilter] = useState<FilterId>('enhance')
@@ -139,6 +144,7 @@ export default function App() {
     setSides({ front: null, back: null })
     setWm(DEFAULT_WATERMARK)
     setError(null)
+    setDone(false)
   }
 
   async function makePdfFile(): Promise<File> {
@@ -167,6 +173,7 @@ export default function App() {
       a.download = file.name
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      setDone(true)
     } catch {
       setError('Something went wrong generating the PDF.')
     } finally {
@@ -183,6 +190,7 @@ export default function App() {
       const file = await makePdfFile()
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: file.name })
+        setDone(true)
       } else {
         setError('Sharing files is not supported on this browser. Use Download instead.')
       }
@@ -307,6 +315,17 @@ export default function App() {
         </button>
       </div>
       {!ready && <p className="hint">Add both the front and back photos to generate the PDF.</p>}
+      {done && (
+        <div className="support-note" role="status">
+          <span>✓ Your PDF is ready.</span>
+          <span>
+            Found this useful?{' '}
+            <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">
+              ☕ Support the developer
+            </a>
+          </span>
+        </div>
+      )}
 
       {overlay?.kind === 'camera' && (
         <Camera

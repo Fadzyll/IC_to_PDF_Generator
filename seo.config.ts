@@ -13,12 +13,29 @@ export function siteUrl(): string {
 }
 
 /**
+ * Google Search Console verification code from GOOGLE_SITE_VERIFICATION.
+ * Accepts either the bare code or the whole <meta ... content="..."> tag as
+ * Google shows it, and ignores stray spaces or quotes.
+ */
+export function verificationCode(raw = process.env.GOOGLE_SITE_VERIFICATION): string | null {
+  if (!raw) return null
+  const fromTag = raw.match(/content\s*=\s*["']?([^"'\s>]+)/i)
+  const code = (fromTag ? fromTag[1] : raw).trim().replace(/^["']|["']$/g, '')
+  // Google's codes are URL-safe base64: letters, digits, '-' and '_'.
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(code)) {
+    console.warn(`[seo] GOOGLE_SITE_VERIFICATION doesn't look like a verification code; skipping it.`)
+    return null
+  }
+  return code
+}
+
+/**
  * Fills %SITE_URL% (and optional Google Search Console verification) into
  * index.html, and emits robots.txt and sitemap.xml at build time.
  */
 export function seo(): Plugin {
   const url = siteUrl()
-  const verification = process.env.GOOGLE_SITE_VERIFICATION
+  const verification = verificationCode()
   return {
     name: 'seo',
     transformIndexHtml(html) {
@@ -26,7 +43,7 @@ export function seo(): Plugin {
       if (verification) {
         html = html.replace(
           '</head>',
-          `  <meta name="google-site-verification" content="${verification.replace(/"/g, '')}" />\n  </head>`,
+          `  <meta name="google-site-verification" content="${verification}" />\n  </head>`,
         )
       }
       return html

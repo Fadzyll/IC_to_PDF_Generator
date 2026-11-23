@@ -52,7 +52,7 @@ site, with no serverless functions.
 The site URL is taken from Vercel's production domain automatically. To use a custom
 domain, set the `SITE_URL` environment variable in Vercel (e.g. `https://ictopdf.my`).
 To verify ownership in Google Search Console with the HTML tag method, set
-`GOOGLE_SITE_VERIFICATION` to the tag's `content` value and redeploy.
+`GOOGLE_SITE_VERIFICATION` to the verification code (or paste the whole meta tag; the code is extracted) and redeploy.
 
 ## Stack
 

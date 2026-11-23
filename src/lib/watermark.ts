@@ -61,6 +61,7 @@ function drawBanner(
   caption: string,
   opts: WatermarkOptions,
   minLength: number,
+  repeatText = false,
 ) {
   const fontSize = cardW * 0.03 * opts.scale
   const gap = fontSize * 1.9 // distance between the two lines
@@ -86,7 +87,16 @@ function drawBanner(
   ctx.moveTo(-length / 2, gap / 2)
   ctx.lineTo(length / 2, gap / 2)
   ctx.stroke()
-  ctx.fillText(caption, 0, 0)
+  if (repeatText) {
+    // Repeat the caption along the whole stripe so every stripe is labelled.
+    const step = textW + fontSize * 3
+    for (let x = 0; x <= length / 2; x += step) {
+      ctx.fillText(caption, x, 0)
+      if (x) ctx.fillText(caption, -x, 0)
+    }
+  } else {
+    ctx.fillText(caption, 0, 0)
+  }
   ctx.restore()
 }
 
@@ -111,7 +121,7 @@ export function drawWatermark(ctx: CanvasRenderingContext2D, card: Rect, opts: W
     const step = w * 0.32 * opts.scale
     const span = w + h
     for (let d = -span; d <= span; d += step) {
-      drawBanner(ctx, x + w / 2 + d * Math.SQRT1_2, y + h / 2 + d * Math.SQRT1_2, -deg45, w, caption, opts, span * 1.5)
+      drawBanner(ctx, x + w / 2 + d * Math.SQRT1_2, y + h / 2 + d * Math.SQRT1_2, -deg45, w, caption, opts, span * 1.5, true)
     }
   } else {
     const minLen = w * 0.44 * opts.scale

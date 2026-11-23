@@ -268,7 +268,7 @@ export default function App() {
 
       <section className="panel">
         <h2>3. Preview</h2>
-        <div className="segmented" role="radiogroup" aria-label="Card size">
+        <div className="segmented" role="group" aria-label="Card size">
           <button type="button" aria-pressed={size === 'enlarged'} onClick={() => setSize('enlarged')}>
             Enlarged
           </button>

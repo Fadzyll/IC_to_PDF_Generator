@@ -5,6 +5,13 @@ import type { Plugin } from 'vite'
  * Set SITE_URL to override (e.g. a custom domain). On Vercel it defaults to the
  * project's production domain automatically.
  */
+/** Public pages, for the sitemap. */
+const PAGES = [
+  { path: '/', priority: '1.0' },
+  { path: '/ic-to-pdf', priority: '0.9' },
+  { path: '/picture-to-pdf', priority: '0.9' },
+]
+
 export function siteUrl(): string {
   const explicit = process.env.SITE_URL
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -59,12 +66,14 @@ export function seo(): Plugin {
         fileName: 'sitemap.xml',
         source: `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${url}/</loc>
+${PAGES.map(
+  (p) => `  <url>
+    <loc>${url}${p.path}</loc>
     <lastmod>${new Date().toISOString().slice(0, 10)}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>1.0</priority>
-  </url>
+    <priority>${p.priority}</priority>
+  </url>`,
+).join('\n')}
 </urlset>
 `,
       })

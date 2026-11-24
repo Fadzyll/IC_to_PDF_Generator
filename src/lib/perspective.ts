@@ -47,7 +47,7 @@ const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
  * Put four arbitrary points into TL, TR, BR, BL order, and make sure the long
  * edge of the card comes out on top (a card is always landscape).
  */
-export function orderQuad(pts: Point[]): Quad {
+export function orderQuad(pts: Point[], landscape = true): Quad {
   const cx = pts.reduce((s, p) => s + p.x, 0) / 4
   const cy = pts.reduce((s, p) => s + p.y, 0) / 4
   // Clockwise on screen (y down), starting from the point nearest top-left.
@@ -59,11 +59,33 @@ export function orderQuad(pts: Point[]): Quad {
   let q = [0, 1, 2, 3].map((i) => sorted[(start + i) % 4]) as Quad
   const horiz = dist(q[0], q[1]) + dist(q[2], q[3])
   const vert = dist(q[1], q[2]) + dist(q[3], q[0])
-  if (vert > horiz) {
+  if (landscape && vert > horiz) {
     // Card was photographed sideways: rotate the order so the long edge is on top.
     q = [q[3], q[0], q[1], q[2]]
   }
   return q
+}
+
+/** Edge lengths of a quad: width (avg of top/bottom) and height (avg of left/right). */
+export function quadSize(q: Quad): { w: number; h: number } {
+  return { w: (dist(q[0], q[1]) + dist(q[3], q[2])) / 2, h: (dist(q[0], q[3]) + dist(q[1], q[2])) / 2 }
+}
+
+/** Output size for straightening `q`, keeping its proportions, with the long edge at most `maxEdge`. */
+export function warpSize(q: Quad, maxEdge: number): { w: number; h: number } {
+  const { w, h } = quadSize(q)
+  const s = Math.min(1, maxEdge / Math.max(w, h)) || 1
+  return { w: Math.max(1, Math.round(w * s)), h: Math.max(1, Math.round(h * s)) }
+}
+
+/** The whole image as a quad. */
+export function fullQuad(w: number, h: number): Quad {
+  return [
+    { x: 0, y: 0 },
+    { x: w, y: 0 },
+    { x: w, y: h },
+    { x: 0, y: h },
+  ]
 }
 
 /** Output width of a straightened card, in px. */

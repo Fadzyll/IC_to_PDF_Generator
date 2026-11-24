@@ -17,7 +17,10 @@ export const FILTERS: { id: FilterId; label: string; hint: string }[] = [
 const clamp = (v: number) => (v < 0 ? 0 : v > 255 ? 255 : v)
 const lum = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b
 
-export function applyFilter(src: HTMLCanvasElement, id: FilterId): HTMLCanvasElement {
+/** What's in the photo: an ID card (keep its colours) or a paper document (make paper white). */
+export type FilterSubject = 'card' | 'document'
+
+export function applyFilter(src: HTMLCanvasElement, id: FilterId, subject: FilterSubject = 'card'): HTMLCanvasElement {
   if (id === 'original') return src
   const w = src.width
   const h = src.height
@@ -36,9 +39,10 @@ export function applyFilter(src: HTMLCanvasElement, id: FilterId): HTMLCanvasEle
       sharpen(d, w, h, 0.6)
       break
     case 'magic':
-      flattenLighting(d, w, h)
+      flattenLighting(d, w, h, subject === 'document')
       levels(d, false, 0.003)
-      saturate(d, 1.35)
+      // Documents: modest colour boost so white paper stays white.
+      saturate(d, subject === 'document' ? 1.15 : 1.35)
       sharpen(d, w, h, 0.8)
       break
     case 'gray':
@@ -128,51 +132,64 @@ function sharpen(d: Uint8ClampedArray, w: number, h: number, amount: number) {
 }
 
 /**
- * Even out uneven lighting and shadows. Estimates how bright the card "should"
+ * Even out uneven lighting and shadows. Estimates how bright the image "should"
  * be everywhere (a smooth envelope of the bright areas) and lifts darker regions
  * towards it, like a scanner's flat lighting.
+ *
+ * With `perChannel` (documents), each colour channel gets its own envelope, which
+ * also removes colour casts so paper comes out white. Cards keep one brightness
+ * envelope so their own colours (MyKad blue) aren't neutralised.
  */
-function flattenLighting(d: Uint8ClampedArray, w: number, h: number) {
+function flattenLighting(d: Uint8ClampedArray, w: number, h: number, perChannel = false) {
   const B = 16 // block size
   const bw = Math.ceil(w / B)
   const bh = Math.ceil(h / B)
-  // Brightness envelope: ~90th percentile brightness per block (robust to glare).
-  let env = new Float32Array(bw * bh)
-  const vals: number[] = []
-  for (let by = 0; by < bh; by++)
-    for (let bx = 0; bx < bw; bx++) {
-      vals.length = 0
-      for (let y = by * B; y < Math.min(h, (by + 1) * B); y += 2)
-        for (let x = bx * B; x < Math.min(w, (bx + 1) * B); x += 2) {
-          const i = (y * w + x) * 4
-          vals.push(lum(d[i], d[i + 1], d[i + 2]))
-        }
-      vals.sort((a, b) => a - b)
-      env[by * bw + bx] = vals[Math.floor(vals.length * 0.9)] ?? 255
-    }
-  // Max filter (ignore dark text/photos), then smooth.
-  const pass = (fn: (vals: number[]) => number, r: number) => {
-    const t = new Float32Array(bw * bh)
-    for (let y = 0; y < bh; y++)
-      for (let x = 0; x < bw; x++) {
-        const v: number[] = []
-        for (let dy = -r; dy <= r; dy++)
-          for (let dx = -r; dx <= r; dx++) {
-            const yy = Math.min(bh - 1, Math.max(0, y + dy))
-            const xx = Math.min(bw - 1, Math.max(0, x + dx))
-            v.push(env[yy * bw + xx])
-          }
-        t[y * bw + x] = fn(v)
+
+  const envelope = (value: (i: number) => number) => {
+    // ~90th percentile per block (robust to glare and to text/photos).
+    let env = new Float32Array(bw * bh)
+    const vals: number[] = []
+    for (let by = 0; by < bh; by++)
+      for (let bx = 0; bx < bw; bx++) {
+        vals.length = 0
+        for (let y = by * B; y < Math.min(h, (by + 1) * B); y += 2)
+          for (let x = bx * B; x < Math.min(w, (bx + 1) * B); x += 2) vals.push(value((y * w + x) * 4))
+        vals.sort((a, b) => a - b)
+        env[by * bw + bx] = vals[Math.floor(vals.length * 0.9)] ?? 255
       }
-    env = t
+    // Max filter (ignore dark text/photos), then smooth.
+    const pass = (fn: (vals: number[]) => number, r: number) => {
+      const t = new Float32Array(bw * bh)
+      for (let y = 0; y < bh; y++)
+        for (let x = 0; x < bw; x++) {
+          const v: number[] = []
+          for (let dy = -r; dy <= r; dy++)
+            for (let dx = -r; dx <= r; dx++) {
+              const yy = Math.min(bh - 1, Math.max(0, y + dy))
+              const xx = Math.min(bw - 1, Math.max(0, x + dx))
+              v.push(env[yy * bw + xx])
+            }
+          t[y * bw + x] = fn(v)
+        }
+      env = t
+    }
+    pass((v) => Math.max(...v), 2)
+    const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length
+    pass(mean, 3)
+    pass(mean, 3)
+    return env
   }
-  pass((v) => Math.max(...v), 2)
-  const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length
-  pass(mean, 3)
-  pass(mean, 3)
+
+  const envs = perChannel
+    ? [0, 1, 2].map((k) => envelope((i) => d[i + k]))
+    : [envelope((i) => lum(d[i], d[i + 1], d[i + 2]))]
 
   // Lift each pixel by target / envelope (bilinear-interpolated), capped.
   const target = 238
+  const maxGain = perChannel ? 2.2 : 1.8
+  const at = (env: Float32Array, x0: number, x1: number, y0: number, y1: number, tx: number, ty: number) =>
+    (env[y0 * bw + x0] * (1 - tx) + env[y0 * bw + x1] * tx) * (1 - ty) +
+    (env[y1 * bw + x0] * (1 - tx) + env[y1 * bw + x1] * tx) * ty
   for (let y = 0; y < h; y++) {
     const fy = Math.min(bh - 1, Math.max(0, y / B - 0.5))
     const y0 = Math.floor(fy)
@@ -183,14 +200,11 @@ function flattenLighting(d: Uint8ClampedArray, w: number, h: number) {
       const x0 = Math.floor(fx)
       const x1 = Math.min(bw - 1, x0 + 1)
       const tx = fx - x0
-      const e =
-        (env[y0 * bw + x0] * (1 - tx) + env[y0 * bw + x1] * tx) * (1 - ty) +
-        (env[y1 * bw + x0] * (1 - tx) + env[y1 * bw + x1] * tx) * ty
-      const gain = Math.min(1.8, Math.max(1, target / Math.max(1, e)))
       const i = (y * w + x) * 4
-      d[i] = clamp(d[i] * gain)
-      d[i + 1] = clamp(d[i + 1] * gain)
-      d[i + 2] = clamp(d[i + 2] * gain)
+      for (let k = 0; k < 3; k++) {
+        const e = at(envs[perChannel ? k : 0], x0, x1, y0, y1, tx, ty)
+        d[i + k] = clamp(d[i + k] * Math.min(maxGain, Math.max(1, target / Math.max(1, e))))
+      }
     }
   }
 }

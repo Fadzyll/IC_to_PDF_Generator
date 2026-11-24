@@ -4,16 +4,22 @@ import { defaultQuad, type Quad } from '../lib/perspective'
 
 interface Props {
   title: string
-  /** `guide` is the guide frame in the captured canvas's pixel coordinates. */
-  onCapture: (frame: HTMLCanvasElement, guide: Quad) => void
+  /** `guide` is the card guide frame in the captured canvas's pixel coordinates (card mode only). */
+  onCapture: (frame: HTMLCanvasElement, guide?: Quad) => void
   onCancel: () => void
   /** Use the phone's own camera app instead (called from a tap, so file inputs may open). */
   onFallback: () => void
+  /** 'card' shows an IC-shaped guide frame; 'document' shows none. */
+  shape?: 'card' | 'document'
+  /** Keep the camera open to take several photos in a row (Picture to PDF). */
+  multi?: { count: number; onDone: () => void }
 }
 
 type TorchCaps = MediaTrackCapabilities & { torch?: boolean }
 
-export function Camera({ title, onCapture, onCancel, onFallback }: Props) {
+export function Camera({ title, onCapture, onCancel, onFallback, shape = 'card', multi }: Props) {
+  const isCard = shape === 'card'
+  const [flash, setFlash] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -79,11 +85,14 @@ export function Camera({ title, onCapture, onCancel, onFallback }: Props) {
     if (!v || !dims) return
     const frame = toCanvas(v, dims.w, dims.h)
     const s = frame.width / dims.w
-    const guide = defaultQuad(dims.w, dims.h).map((p) => ({ x: p.x * s, y: p.y * s })) as Quad
+    const guide = isCard ? (defaultQuad(dims.w, dims.h).map((p) => ({ x: p.x * s, y: p.y * s })) as Quad) : undefined
+    // A quick flash so it's clear a photo was taken (the camera stays open in multi mode).
+    setFlash(true)
+    setTimeout(() => setFlash(false), 140)
     onCapture(frame, guide)
   }
 
-  const guide = dims ? defaultQuad(dims.w, dims.h) : null
+  const guide = dims && isCard ? defaultQuad(dims.w, dims.h) : null
 
   return (
     <div className="modal camera" role="dialog" aria-modal="true" aria-label={`Snap ${title}`}>
@@ -127,11 +136,28 @@ export function Camera({ title, onCapture, onCancel, onFallback }: Props) {
               }}
             />
           )}
+          {flash && <div className="cam-flash" />}
         </div>
       </div>
       <div className="cam-controls">
-        <p>Fit the card inside the frame, on a plain dark surface, in good light.</p>
-        <button type="button" className="shutter" aria-label="Take photo" onClick={capture} disabled={!dims} />
+        <p>
+          {isCard
+            ? 'Fit the card inside the frame, on a plain dark surface, in good light.'
+            : 'Fill the screen with the page, on a contrasting surface, in good light.'}
+        </p>
+        <div className="cam-row">
+          <span className="cam-count" aria-live="polite">
+            {multi && multi.count > 0 ? `${multi.count} page${multi.count === 1 ? '' : 's'}` : ''}
+          </span>
+          <button type="button" className="shutter" aria-label="Take photo" onClick={capture} disabled={!dims} />
+          <span className="cam-done">
+            {multi && (
+              <button type="button" className="primary" onClick={multi.onDone} disabled={multi.count === 0}>
+                Done
+              </button>
+            )}
+          </span>
+        </div>
       </div>
     </div>
   )

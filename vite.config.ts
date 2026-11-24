@@ -5,6 +5,16 @@ import { seo } from './seo.config.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Three pages: the landing page and one per tool (served as /ic-to-pdf and /picture-to-pdf).
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        ic: 'ic-to-pdf.html',
+        picture: 'picture-to-pdf.html',
+      },
+    },
+  },
   plugins: [
     react(),
     seo(),
@@ -12,9 +22,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'IC to PDF',
-        short_name: 'IC to PDF',
-        description: 'Turn photos of your IC into a watermarked A4 PDF. Processed entirely on your device.',
+        name: 'ScanGo PDF',
+        short_name: 'ScanGo PDF',
+        description: 'Scan your IC or any photos into a PDF. Free, private, and processed entirely on your device.',
         theme_color: '#1f5fd1',
         background_color: '#f4f6fa',
         display: 'standalone',
@@ -30,6 +40,9 @@ export default defineConfig({
         // Precache everything (incl. the lazily-loaded PDF chunk) so it works offline.
         globPatterns: ['**/*.{js,css,html,svg,png}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Multi-page site: no single-page fallback. Precached pages are matched by clean
+        // URL (/ic-to-pdf -> ic-to-pdf.html), so every page still works offline.
+        navigateFallback: null,
       },
     }),
   ],

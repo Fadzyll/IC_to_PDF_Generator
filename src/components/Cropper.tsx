@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { detectCard } from '../lib/detect'
-import { orderQuad, warpCard, type Point, type Quad } from '../lib/perspective'
+import { detectCard, type DetectShape } from '../lib/detect'
+import { orderQuad, warpCard, warpSize, type Point, type Quad } from '../lib/perspective'
 import { ctx2d, rotate180, wipe } from '../lib/image'
 
 export interface CropResult {
@@ -14,12 +14,16 @@ interface Props {
   initial: CropResult
   onCancel: () => void
   onDone: (r: CropResult) => void
+  /** 'card' (IC, fixed landscape shape) or 'document' (any page shape). */
+  shape?: DetectShape
 }
 
 const LOUPE = 120 // css px
 const ZOOM = 3
 
-export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
+export function Cropper({ title, source, initial, onCancel, onDone, shape = 'card' }: Props) {
+  const isCard = shape === 'card'
+  const ordered = (q: Quad) => orderQuad(q, isCard)
   const [quad, setQuad] = useState<Quad>(initial.quad)
   const [flipped, setFlipped] = useState(initial.flipped)
   const [drag, setDrag] = useState<number | null>(null)
@@ -69,7 +73,10 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     const c = previewRef.current
     if (!c) return
     try {
-      const warped = warpCard(source, orderQuad(quad), 360, 227)
+      const card = shape === 'card'
+      const q = orderQuad(quad, card)
+      const size = card ? { w: 360, h: 227 } : warpSize(q, 360)
+      const warped = warpCard(source, q, size.w, size.h)
       const out = flipped ? rotate180(warped) : warped
       c.width = out.width
       c.height = out.height
@@ -79,7 +86,7 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
     } catch (e) {
       console.error(e) // preview only; the crop itself still works
     }
-  }, [source, quad, flipped, drag])
+  }, [source, quad, flipped, drag, shape])
 
   const toSource = useCallback(
     (e: React.PointerEvent): Point => {
@@ -141,12 +148,12 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
   const endDrag = () => setDrag(null)
 
   const autoDetect = () => {
-    const q = detectCard(source)
+    const q = detectCard(source, undefined, shape)
     if (q) {
       setQuad(q)
       setNote(null)
     } else {
-      setNote("Couldn't find the card edges automatically. Drag the corners instead.")
+      setNote(`Couldn't find the ${isCard ? 'card' : 'page'} edges automatically. Drag the corners instead.`)
     }
   }
 
@@ -166,7 +173,7 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
           Cancel
         </button>
         <strong>Crop {title}</strong>
-        <button type="button" className="primary" onClick={() => onDone({ quad: orderQuad(quad), flipped })}>
+        <button type="button" className="primary" onClick={() => onDone({ quad: ordered(quad), flipped })}>
           Done
         </button>
       </div>
@@ -223,9 +230,12 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
           <button type="button" onClick={autoDetect}>
             ✨ Auto-detect
           </button>
-          <button type="button" onClick={() => setFlipped((f) => !f)}>
-            ↻ Flip 180°
-          </button>
+          {/* Pages are rotated from the page list instead. */}
+          {isCard && (
+            <button type="button" onClick={() => setFlipped((f) => !f)}>
+              ↻ Flip 180°
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -254,7 +264,7 @@ export function Cropper({ title, source, initial, onCancel, onDone }: Props) {
             ↺ Reset
           </button>
         </div>
-        {note ? <p className="crop-note">{note}</p> : <p className="crop-note">Drag the 4 corners onto the card's corners.</p>}
+        {note ? <p className="crop-note">{note}</p> : <p className="crop-note">Drag the 4 corners onto the {isCard ? "card's" : "page's"} corners.</p>}
       </div>
     </div>
   )

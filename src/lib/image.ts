@@ -62,3 +62,52 @@ export function wipe(canvas: HTMLCanvasElement | null | undefined) {
   canvas.width = 0
   canvas.height = 0
 }
+
+/** Rotate a canvas clockwise by 90, 180 or 270 degrees, returning a new canvas. */
+export function rotateCanvas(src: HTMLCanvasElement, deg: 90 | 180 | 270): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  const quarter = deg !== 180
+  out.width = quarter ? src.height : src.width
+  out.height = quarter ? src.width : src.height
+  const ctx = ctx2d(out)
+  ctx.translate(out.width / 2, out.height / 2)
+  ctx.rotate((deg * Math.PI) / 180)
+  ctx.drawImage(src, -src.width / 2, -src.height / 2)
+  return out
+}
+
+/** Encode a canvas (JPEG by default). Safari returns null when out of canvas memory. */
+export function canvasToBlob(canvas: HTMLCanvasElement, quality = 0.9, type = 'image/jpeg'): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new CanvasMemoryError())), type, quality),
+  )
+}
+
+/** Decode an image blob into a canvas, optionally downscaled so its long edge is at most `maxEdge`. */
+export async function blobToCanvas(blob: Blob, maxEdge = Infinity): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(blob)
+  try {
+    const s = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+    const c = document.createElement('canvas')
+    c.width = Math.max(1, Math.round(bitmap.width * s))
+    c.height = Math.max(1, Math.round(bitmap.height * s))
+    const ctx = ctx2d(c)
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bitmap, 0, 0, c.width, c.height)
+    return c
+  } finally {
+    bitmap.close()
+  }
+}
+
+/** A downscaled copy of a canvas (long edge at most `maxEdge`). */
+export function scaledCopy(src: HTMLCanvasElement, maxEdge: number): HTMLCanvasElement {
+  const s = Math.min(1, maxEdge / Math.max(src.width, src.height))
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.round(src.width * s))
+  c.height = Math.max(1, Math.round(src.height * s))
+  const ctx = ctx2d(c)
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(src, 0, 0, c.width, c.height)
+  return c
+}

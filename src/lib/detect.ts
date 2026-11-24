@@ -20,7 +20,14 @@ interface Line {
   votes: number
 }
 
-export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
+/**
+ * 'card': an ID-1 card (fixed 85.6 × 54 proportions, always landscape).
+ * 'document': a page, receipt or note: any reasonable proportions, any orientation.
+ */
+export type DetectShape = 'card' | 'document'
+
+export function detectCard(src: HTMLCanvasElement, region?: Quad, shape: DetectShape = 'card'): Quad | null {
+  const isCard = shape === 'card'
   const scale = Math.min(1, WORK / Math.max(src.width, src.height))
   const w = Math.max(8, Math.round(src.width * scale))
   const h = Math.max(8, Math.round(src.height * scale))
@@ -80,7 +87,8 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
   // is found. Strong text edges on the card can otherwise drown out a faint
   // card border, e.g. a light card on a light table.
   // Prefer four real edges at any threshold before inferring a missing one.
-  for (const inferMissing of [false, true]) {
+  // (Inferring a missing edge needs known proportions, so only for cards.)
+  for (const inferMissing of isCard ? [false, true] : [false]) {
     for (const pct of [0.88, 0.75, 0.6]) {
       const q = findQuad(Math.max(30, sample[Math.floor(sample.length * pct)]), inferMissing)
       if (q) {
@@ -243,7 +251,7 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
      */
     const evaluate = (pts: (Point | null)[], oneWeakEdge: boolean) => {
       if (pts.some((p) => !p || p.x < -margin || p.y < -margin || p.x > w + margin || p.y > h + margin)) return
-      const q = orderQuad(pts as Point[])
+      const q = orderQuad(pts as Point[], isCard)
       const top = Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y)
       const bot = Math.hypot(q[2].x - q[3].x, q[2].y - q[3].y)
       const left = Math.hypot(q[3].x - q[0].x, q[3].y - q[0].y)
@@ -252,9 +260,14 @@ export function detectCard(src: HTMLCanvasElement, region?: Quad): Quad | null {
       // Allow for perspective: opposite edges within 35% of each other.
       if (Math.min(top, bot) / Math.max(top, bot) < 0.65 || Math.min(left, right) / Math.max(left, right) < 0.65) return
       const ratio = (top + bot) / (left + right)
-      if (ratio < cardRatio * 0.72 || ratio > cardRatio * 1.35) return
+      if (isCard) {
+        if (ratio < cardRatio * 0.72 || ratio > cardRatio * 1.35) return
+      } else if (Math.max(ratio, 1 / ratio) > 4) {
+        return // pages and receipts: anything up to 4:1
+      }
       const area = 0.5 * Math.abs(q.reduce((s, p, n) => s + p.x * q[(n + 1) % 4].y - q[(n + 1) % 4].x * p.y, 0))
-      if (area < w * h * 0.08) return
+      // Documents usually fill much of the photo; small rectangles are more likely things printed on it.
+      if (area < w * h * (isCard ? 0.08 : 0.15)) return
 
       const s = [support(q[0], q[1]), support(q[1], q[2]), support(q[2], q[3]), support(q[3], q[0])]
       const cst = [contrast(q[0], q[1]), contrast(q[1], q[2]), contrast(q[2], q[3]), contrast(q[3], q[0])]

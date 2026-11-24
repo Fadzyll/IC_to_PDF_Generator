@@ -106,6 +106,21 @@
     </script>
   </head>
   <body class="landing">
+    <!-- Reusable icons (drawn, so they look the same on every device) -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+        <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" fill="currentColor"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor"/></symbol>
+        <symbol id="i-offline" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+        <symbol id="i-adjust" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+        <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="i-cross" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11m0-11l-11 11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+      </defs>
+    </svg>
+
     <nav class="topnav" aria-label="Main">
       <a class="brand" href="/" aria-current="page">ScanGo PDF</a>
       <a href="/ic-to-pdf">IC to PDF</a>
@@ -114,16 +129,118 @@
 
     <main>
       <section class="hero">
-        <h1>Scan to PDF, right in your browser</h1>
-        <p class="lead">
-          Make a safe copy of your IC, or turn any photos into a clean PDF. Free, no sign-up, and your photos never leave
-          your phone.
-        </p>
+        <div class="hero-text">
+          <p class="eyebrow">Free · No sign-up · Nothing uploaded</p>
+          <h1>Scan your IC and documents to PDF, right on your phone</h1>
+          <p class="lead">
+            Snap a photo and get a clean, straightened PDF in seconds. Add a watermark to your IC copy so it can't be
+            misused, or combine many pages into one file.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/ic-to-pdf">
+              <svg width="20" height="20"><use href="#i-camera" /></svg>
+              Scan my IC
+            </a>
+            <a class="btn btn-secondary" href="/picture-to-pdf">Photos to PDF</a>
+          </div>
+          <ul class="trust">
+            <li><svg width="16" height="16"><use href="#i-check" /></svg>Works on iPhone &amp; Android</li>
+            <li><svg width="16" height="16"><use href="#i-check" /></svg>Works offline</li>
+            <li><svg width="16" height="16"><use href="#i-check" /></svg>No ads</li>
+          </ul>
+        </div>
 
-        <div class="tool-cards">
-          <a class="tool-card" href="/ic-to-pdf">
-            <span class="tool-icon" aria-hidden="true">
-              <svg viewBox="0 0 48 48" width="40" height="40">
+        <!-- Before -> after illustration -->
+        <div class="hero-visual" aria-hidden="true">
+          <svg viewBox="0 14 440 296" class="hero-svg">
+            <defs>
+              <linearGradient id="table" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#8a6342" />
+                <stop offset="1" stop-color="#5e412a" />
+              </linearGradient>
+              <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#000" stop-opacity="0" />
+                <stop offset="1" stop-color="#000" stop-opacity="0.35" />
+              </linearGradient>
+              <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity="0.25" />
+              </filter>
+            </defs>
+            <!-- Phone photo: tilted card on a table -->
+            <g filter="url(#drop)">
+              <rect x="14" y="40" width="170" height="260" rx="22" fill="#1a1f2b" stroke="#3a4256" stroke-width="1.5" />
+              <rect x="22" y="52" width="154" height="236" rx="14" fill="url(#table)" />
+              <g transform="rotate(-9 99 168)">
+                <rect x="38" y="128" width="122" height="78" rx="7" fill="#a9c9ef" />
+                <rect x="48" y="155" width="16" height="13" rx="2" fill="#d9ad4f" />
+                <rect x="124" y="140" width="24" height="34" rx="9" fill="#e6f0fb" />
+                <rect x="48" y="138" width="52" height="5" rx="2.5" fill="#2b3a67" />
+                <rect x="48" y="180" width="44" height="3.5" rx="1.7" fill="#4a5878" />
+                <rect x="48" y="188" width="34" height="3.5" rx="1.7" fill="#4a5878" />
+                <!-- detected corners -->
+                <g fill="#fff" stroke="#3d7cf0" stroke-width="2.5">
+                  <circle cx="38" cy="128" r="5" /><circle cx="160" cy="128" r="5" /><circle cx="160" cy="206" r="5" /><circle cx="38" cy="206" r="5" />
+                </g>
+                <rect x="38" y="128" width="122" height="78" rx="7" fill="none" stroke="#3d7cf0" stroke-width="2" />
+              </g>
+              <rect x="22" y="52" width="154" height="236" rx="14" fill="url(#shade)" />
+            </g>
+
+            <!-- Arrow -->
+            <g class="hero-arrow">
+              <circle cx="214" cy="170" r="20" />
+              <path d="M205 170h16m-6-7l7 7-7 7" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            </g>
+
+            <!-- Clean A4 PDF page with both sides and the watermark -->
+            <g filter="url(#drop)">
+              <rect x="248" y="22" width="178" height="252" rx="6" fill="#fff" />
+              <g>
+                <rect x="284" y="52" width="106" height="67" rx="6" fill="#bcd7f5" />
+                <rect x="293" y="76" width="14" height="11" rx="2" fill="#d9ad4f" />
+                <rect x="360" y="62" width="21" height="30" rx="8" fill="#eef5fd" />
+                <rect x="293" y="60" width="45" height="4.5" rx="2.2" fill="#2b3a67" />
+                <rect x="293" y="99" width="38" height="3" rx="1.5" fill="#4a5878" />
+                <rect x="293" y="106" width="30" height="3" rx="1.5" fill="#4a5878" />
+              </g>
+              <g>
+                <rect x="284" y="150" width="106" height="67" rx="6" fill="#c9dcf3" />
+                <rect x="296" y="160" width="16" height="16" rx="8" fill="#e2c477" opacity="0.8" />
+                <rect x="320" y="190" width="40" height="3" rx="1.5" fill="#4a5878" />
+                <rect x="320" y="197" width="30" height="3" rx="1.5" fill="#4a5878" />
+              </g>
+              <!-- watermark banners -->
+              <g stroke="#111" stroke-width="1.2">
+                <g transform="rotate(-45 290 58)">
+                  <line x1="262" y1="53" x2="318" y2="53" /><line x1="262" y1="63" x2="318" y2="63" />
+                </g>
+                <g transform="rotate(-45 290 156)">
+                  <line x1="262" y1="151" x2="318" y2="151" /><line x1="262" y1="161" x2="318" y2="161" />
+                </g>
+              </g>
+              <g fill="#111" font-family="Arial, sans-serif" font-size="5.2" font-weight="700">
+                <text transform="rotate(-45 290 58)" x="290" y="60" text-anchor="middle">FOR BANK USE ONLY</text>
+                <text transform="rotate(-45 290 156)" x="290" y="158" text-anchor="middle">FOR BANK USE ONLY</text>
+              </g>
+              <rect x="248" y="248" width="178" height="26" fill="#f3f5f9" />
+              <text x="262" y="265" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#c0392b">PDF</text>
+              <text x="288" y="265" font-family="Arial, sans-serif" font-size="9.5" fill="#5d6677">IC-for-bank-use.pdf</text>
+            </g>
+          </svg>
+          <div class="visual-caption">
+            <span>Phone photo</span>
+            <span>Clean PDF</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="tools" aria-labelledby="tools-title">
+        <h2 id="tools-title" class="section-title">Pick a tool</h2>
+        <div class="tool-grid">
+          <a class="tool" href="/ic-to-pdf">
+            <span class="tool-badge">Most popular</span>
+            <span class="tool-art ic" aria-hidden="true">
+              <svg viewBox="0 0 48 48" width="44" height="44">
                 <rect x="4" y="11" width="40" height="26" rx="4" fill="#a9cdf5" />
                 <rect x="9" y="19" width="8" height="7" rx="1.5" fill="#d9ad4f" />
                 <rect x="31" y="16" width="8" height="12" rx="3" fill="#eef5fd" />
@@ -131,16 +248,20 @@
                 <path d="M2 24 L20 6 M6 28 L24 10" stroke="#1a1f2b" stroke-width="2" />
               </svg>
             </span>
-            <span class="tool-text">
-              <strong>IC to PDF</strong>
-              <span>Front and back of your MyKad on one A4 page, with a watermark like “FOR BANK ACCOUNT OPENING ONLY”.</span>
-            </span>
-            <span class="tool-go" aria-hidden="true">→</span>
+            <span class="tool-name">IC to PDF</span>
+            <span class="tool-desc">Front and back of your MyKad on one A4 page, ready for banks, employers and landlords.</span>
+            <ul class="tool-points">
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Watermark with purpose &amp; date</li>
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Auto-detects the card edges</li>
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Actual size or enlarged</li>
+            </ul>
+            <span class="tool-go">Start IC to PDF <span aria-hidden="true">→</span></span>
           </a>
 
-          <a class="tool-card" href="/picture-to-pdf">
-            <span class="tool-icon" aria-hidden="true">
-              <svg viewBox="0 0 48 48" width="40" height="40">
+          <a class="tool" href="/picture-to-pdf">
+            <span class="tool-badge new">New</span>
+            <span class="tool-art doc" aria-hidden="true">
+              <svg viewBox="0 0 48 48" width="44" height="44">
                 <rect x="14" y="4" width="26" height="34" rx="3" fill="#dfe6f1" />
                 <rect x="8" y="10" width="26" height="34" rx="3" fill="#ffffff" stroke="#b7c3d6" stroke-width="1.5" />
                 <rect x="12" y="16" width="14" height="2.5" rx="1.2" fill="#2a2d33" />
@@ -149,31 +270,112 @@
                 <rect x="12" y="32" width="18" height="2" rx="1" fill="#7a8291" />
               </svg>
             </span>
-            <span class="tool-text">
-              <strong>Picture to PDF</strong>
-              <span>Snap or pick one or many photos (documents, receipts, notes) and save them as a single PDF.</span>
-            </span>
-            <span class="tool-go" aria-hidden="true">→</span>
+            <span class="tool-name">Picture to PDF</span>
+            <span class="tool-desc">Turn documents, receipts, forms and notes into one tidy multi-page PDF.</span>
+            <ul class="tool-points">
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Pick many photos at once</li>
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Removes shadows, whitens paper</li>
+              <li><svg width="16" height="16"><use href="#i-check" /></svg>Reorder, rotate, up to 50 pages</li>
+            </ul>
+            <span class="tool-go">Start Picture to PDF <span aria-hidden="true">→</span></span>
           </a>
         </div>
       </section>
 
-      <section class="features" aria-label="Why ScanGo PDF">
-        <div>
-          <strong>🔒 Private</strong>
-          <span>Everything happens on your device. Nothing is uploaded.</span>
+      <section class="steps" aria-labelledby="steps-title">
+        <h2 id="steps-title" class="section-title">How it works</h2>
+        <ol class="step-list">
+          <li>
+            <span class="step-icon"><svg width="24" height="24"><use href="#i-camera" /></svg></span>
+            <strong>1. Snap</strong>
+            <span>Take a photo with your camera, or choose from your gallery.</span>
+          </li>
+          <li>
+            <span class="step-icon"><svg width="24" height="24"><use href="#i-adjust" /></svg></span>
+            <strong>2. Adjust</strong>
+            <span>Edges are found automatically. Pick a filter and add a watermark if you need one.</span>
+          </li>
+          <li>
+            <span class="step-icon"><svg width="24" height="24"><use href="#i-share" /></svg></span>
+            <strong>3. Download or share</strong>
+            <span>Save the PDF, or send it straight to WhatsApp or email.</span>
+          </li>
+        </ol>
+      </section>
+
+      <section class="privacy-block" aria-labelledby="privacy-title">
+        <div class="privacy-text">
+          <span class="privacy-icon"><svg width="28" height="28"><use href="#i-lock" /></svg></span>
+          <h2 id="privacy-title">Your IC never leaves your phone</h2>
+          <p>
+            Most online converters upload your photos to their servers. ScanGo PDF does all the work inside your browser,
+            so your IC and documents are never sent anywhere, not even to us.
+          </p>
         </div>
+        <table class="compare">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Feature</span></th>
+              <th scope="col">ScanGo PDF</th>
+              <th scope="col">Typical online converter</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Photos stay on your device</th>
+              <td class="yes"><svg width="18" height="18"><use href="#i-check" /></svg><span class="sr-only">Yes</span></td>
+              <td class="no"><svg width="18" height="18"><use href="#i-cross" /></svg><span class="sr-only">No</span></td>
+            </tr>
+            <tr>
+              <th scope="row">No account or sign-up</th>
+              <td class="yes"><svg width="18" height="18"><use href="#i-check" /></svg><span class="sr-only">Yes</span></td>
+              <td class="no"><svg width="18" height="18"><use href="#i-cross" /></svg><span class="sr-only">Often required</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Works without internet</th>
+              <td class="yes"><svg width="18" height="18"><use href="#i-check" /></svg><span class="sr-only">Yes</span></td>
+              <td class="no"><svg width="18" height="18"><use href="#i-cross" /></svg><span class="sr-only">No</span></td>
+            </tr>
+            <tr>
+              <th scope="row">No ads, no watermark you didn't add</th>
+              <td class="yes"><svg width="18" height="18"><use href="#i-check" /></svg><span class="sr-only">Yes</span></td>
+              <td class="no"><svg width="18" height="18"><use href="#i-cross" /></svg><span class="sr-only">Often not</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="uses" aria-labelledby="uses-title">
+        <h2 id="uses-title" class="section-title">Handy for</h2>
+        <ul class="use-chips">
+          <li>Opening a bank account</li>
+          <li>Job applications</li>
+          <li>Renting a house</li>
+          <li>Insurance claims</li>
+          <li>Phone line registration</li>
+          <li>Receipts &amp; expense claims</li>
+          <li>School &amp; university forms</li>
+          <li>Handwritten notes</li>
+        </ul>
+      </section>
+
+      <section class="features" aria-label="Features">
         <div>
-          <strong>✂️ Auto crop</strong>
+          <span class="feat-icon"><svg width="22" height="22"><use href="#i-crop" /></svg></span>
+          <strong>Auto crop</strong>
           <span>Finds the edges and straightens tilted photos.</span>
         </div>
         <div>
-          <strong>✨ Scanner filters</strong>
-          <span>Remove shadows and make colours and text crisp.</span>
+          <span class="feat-icon"><svg width="22" height="22"><use href="#i-spark" /></svg></span>
+          <strong>Scanner filters</strong>
+          <span>Remove shadows, fix colours, make text crisp.</span>
         </div>
         <div>
-          <strong>📶 Works offline</strong>
-          <span>Install it on your home screen like an app.</span>
+          <span class="feat-icon"><svg width="22" height="22"><use href="#i-offline" /></svg></span>
+          <strong>Install like an app</strong>
+          <span>Add it to your home screen and use it offline.</span>
+          <button type="button" class="btn btn-small" id="install-btn" hidden>Install app</button>
+          <span class="install-hint" id="install-hint" hidden>On iPhone: tap Share, then “Add to Home Screen”.</span>
         </div>
       </section>
 
@@ -218,22 +420,28 @@
             </p>
           </details>
         </section>
-
-        <footer>
-          <p class="support">
-            ScanGo PDF is free, with no ads and no sign-up. If it helped you,
-            <a href="https://sociabuzz.com/fadzyll007/tribe" target="_blank" rel="noopener noreferrer"
-              >☕ support the developer on SociaBuzz</a
-            >.
-          </p>
-          <p>
-            ScanGo PDF is an independent tool and is not affiliated with Jabatan Pendaftaran Negara (JPN) or the Government
-            of Malaysia.
-          </p>
-        </footer>
       </div>
     </main>
 
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div>
+          <a class="brand" href="/">ScanGo PDF</a>
+          <p>Free phone scanner in your browser.</p>
+        </div>
+        <nav aria-label="Tools">
+          <a href="/ic-to-pdf">IC to PDF</a>
+          <a href="/picture-to-pdf">Picture to PDF</a>
+          <a href="https://sociabuzz.com/fadzyll007/tribe" target="_blank" rel="noopener noreferrer">☕ Support the developer</a>
+        </nav>
+      </div>
+      <p class="disclaimer">
+        ScanGo PDF is an independent tool and is not affiliated with Jabatan Pendaftaran Negara (JPN) or the Government of
+        Malaysia.
+      </p>
+    </footer>
+
     <script type="module" src="/src/apps/landing/main.ts"></script>
   </body>
+</html>
 </html>
